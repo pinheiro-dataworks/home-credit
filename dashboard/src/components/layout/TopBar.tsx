@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import { HelpCircle, Bell, MessageSquare, Share2, RefreshCw, ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
 import type {
@@ -54,12 +53,8 @@ export default function TopBar({ filters, onChange, onRefresh, title = "Overview
   return (
     <header className="fixed top-0 left-60 right-0 h-16 bg-white border-b border-surface-border
                        flex items-center px-6 gap-4 z-30">
-      {/* Logo + breadcrumb */}
+      {/* Breadcrumb */}
       <div className="flex items-center gap-3 shrink-0">
-        <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-surface-border">
-          <Image src="/logo.png" alt="Home Credit" fill style={{ objectFit: "contain" }}
-                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        </div>
         <nav className="flex items-center gap-1.5 text-xs text-ink-muted">
           {crumbs.map((c, i) => (
             <span key={c} className="flex items-center gap-1.5">

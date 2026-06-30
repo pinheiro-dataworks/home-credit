@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   LayoutDashboard, TrendingUp, Zap, BarChart2,
-  Search, ChevronRight, Shield, ArrowUpRight,
+  Search, ChevronRight, ArrowUpRight,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -21,11 +22,14 @@ export default function Sidebar() {
     <aside className="fixed inset-y-0 left-0 w-60 flex flex-col bg-white border-r border-surface-border z-40">
       {/* Logo area */}
       <div className="h-16 flex items-center px-5 border-b border-surface-border shrink-0">
-        <Shield className="w-6 h-6 text-brand-600 mr-2.5" strokeWidth={2} />
-        <div>
-          <p className="text-sm font-semibold text-ink leading-none">Home Credit</p>
-          <p className="text-[10px] text-ink-light mt-0.5">Risk Intelligence</p>
-        </div>
+        <Image
+          src="/logo.png"
+          alt="Home Credit"
+          width={153}
+          height={55}
+          style={{ width: "153px", height: "auto", maxHeight: "55px" }}
+          priority
+        />
       </div>
 
       {/* Search */}
@@ -99,7 +103,7 @@ export default function Sidebar() {
           LightGBM · AUC 0.78 · Deployed on Render
         </p>
         <a
-          href="https://github.com"
+          href="https://github.com/pinheiro-dataworks?tab=repositories"
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 text-xs font-medium bg-white text-brand-700
