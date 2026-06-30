@@ -1,5 +1,4 @@
 {
-  "rootDirectory": "dashboard",
   "buildCommand": "npm run build",
   "outputDirectory": "out",
   "framework": "nextjs",
