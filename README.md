@@ -248,6 +248,8 @@ docker-compose up
 3. Point to this repo — Render auto-detects `render.yaml`
 4. The `Dockerfile` handles all dependencies
 
+> **Live API:** `https://home-credit-api-gima.onrender.com` ([Swagger docs](https://home-credit-api-gima.onrender.com/docs))
+
 ### Dashboard → Vercel
 1. Connect to [Vercel](https://vercel.com) and import the GitHub repository
 2. Set **Root Directory** to `dashboard`
