@@ -25,9 +25,9 @@ export default function Sidebar() {
         <Image
           src="/logo.png"
           alt="Home Credit"
-          width={153}
-          height={55}
-          style={{ width: "153px", height: "auto", maxHeight: "55px" }}
+          width={2899}
+          height={1164}
+          style={{ width: "150px", height: "auto" }}
           priority
         />
       </div>
