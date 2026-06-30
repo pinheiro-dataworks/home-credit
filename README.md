@@ -281,7 +281,7 @@ Tracked per run: all Optuna hyperparameters, AUC-ROC, F1, KS statistic, optimal 
 
 ## Author
 
-**Rafael Pinheiro**
+**Renan Pinhiero**
 Data Scientist · [github.com/pinheiro-dataworks](https://github.com/pinheiro-dataworks?tab=repositories)
 
 ---
