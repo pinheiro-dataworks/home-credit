@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    @apply bg-surface-muted text-ink font-sans antialiased;
+    font-size: 14px;
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-surface-border rounded-full; }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface rounded-2xl border border-surface-border shadow-card p-5;
+  }
+  .badge-low    { @apply bg-green-100  text-green-700  text-xs font-medium px-2.5 py-0.5 rounded-full; }
+  .badge-medium { @apply bg-amber-100  text-amber-700  text-xs font-medium px-2.5 py-0.5 rounded-full; }
+  .badge-high   { @apply bg-red-100    text-red-700    text-xs font-medium px-2.5 py-0.5 rounded-full; }
+  .btn-primary  {
+    @apply bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium
+           px-4 py-2 rounded-xl transition-colors duration-150 focus:outline-none
+           focus:ring-2 focus:ring-brand-500 focus:ring-offset-1;
+  }
+  .btn-ghost {
+    @apply text-ink-muted hover:bg-surface-muted text-sm px-3 py-2 rounded-xl
+           transition-colors duration-150;
+  }
+  .input-field {
+    @apply w-full border border-surface-border rounded-xl px-3 py-2 text-sm
+           bg-surface focus:outline-none focus:ring-2 focus:ring-brand-500
+           focus:border-transparent placeholder-ink-light transition;
+  }
+  .select-field {
+    @apply input-field appearance-none cursor-pointer;
+  }
+  .stat-value { @apply text-2xl font-semibold text-ink tracking-tight; }
+  .stat-label { @apply text-xs text-ink-muted font-medium uppercase tracking-wide mt-0.5; }
+}

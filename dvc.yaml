@@ -1,0 +1,67 @@
+stages:
+  feature_engineering:
+    cmd: python pipeline.py --stage features
+    deps:
+      - data/raw/application_train.csv
+      - data/raw/application_test.csv
+      - data/raw/bureau.csv
+      - data/raw/bureau_balance.csv
+      - data/raw/previous_application.csv
+      - data/raw/POS_CASH_balance.csv
+      - data/raw/credit_card_balance.csv
+      - data/raw/installments_payments.csv
+      - src/data/loader.py
+      - src/features/engineering.py
+      - params.yaml
+    params:
+      - data
+      - feature_engineering
+    outs:
+      - data/processed/train_features.parquet
+      - data/processed/test_features.parquet
+      - data/features/feature_names.json
+
+  statistical_analysis:
+    cmd: python pipeline.py --stage stats
+    deps:
+      - data/processed/train_features.parquet
+      - src/utils/stats.py
+      - params.yaml
+    params:
+      - statistics
+    outs:
+      - models/artifacts/statistical_report.json
+
+  train:
+    cmd: python pipeline.py --stage train
+    deps:
+      - data/processed/train_features.parquet
+      - src/models/train.py
+      - src/models/evaluate.py
+      - src/utils/stats.py
+      - params.yaml
+    params:
+      - model
+      - sampling
+      - lightgbm_defaults
+      - threshold
+      - calibration
+      - mlflow
+    outs:
+      - models/artifacts/model.pkl
+      - models/artifacts/calibrated_model.pkl
+      - models/artifacts/threshold.json
+      - models/artifacts/feature_names.json
+      - models/artifacts/precomputed_stats.json
+    metrics:
+      - models/artifacts/metrics.json:
+          cache: false
+
+  predict:
+    cmd: python pipeline.py --stage predict
+    deps:
+      - data/processed/test_features.parquet
+      - models/artifacts/calibrated_model.pkl
+      - models/artifacts/threshold.json
+    outs:
+      - data/processed/submission.csv

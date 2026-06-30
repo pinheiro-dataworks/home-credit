@@ -1,0 +1,58 @@
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  features_dir: data/features
+  target_col: TARGET
+  id_col: SK_ID_CURR
+  test_size: 0.2
+  random_state: 42
+
+feature_engineering:
+  include_bureau: true
+  include_previous: true
+  include_pos_cash: true
+  include_credit_card: true
+  include_installments: true
+  nan_threshold: 0.6            # drop columns with > 60% NaN
+
+sampling:
+  method: smote                 # smote | adasyn | none
+  sampling_strategy: 0.3
+  k_neighbors: 5
+
+model:
+  type: lightgbm
+  n_trials: 50                  # Optuna trials
+  pruning: true                 # Optuna MedianPruner
+  cv_folds: 5
+  n_jobs: -1
+
+lightgbm_defaults:
+  learning_rate: 0.05
+  n_estimators: 1000
+  max_depth: -1
+  num_leaves: 63
+  min_child_samples: 30
+  subsample: 0.8
+  colsample_bytree: 0.8
+  reg_alpha: 0.1
+  reg_lambda: 1.0
+  class_weight: balanced
+
+threshold:
+  optimize: true
+  metric: f1                    # f1 | precision | recall | ks
+
+calibration:
+  method: isotonic             # isotonic | sigmoid
+  cv: prefit
+
+mlflow:
+  experiment_name: home_credit_default_risk
+  tracking_uri: mlruns
+  registered_model_name: home_credit_lgbm
+
+statistics:
+  bootstrap_n_iterations: 1000
+  bootstrap_ci: 0.95
+  alpha: 0.05

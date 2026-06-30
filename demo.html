@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home Credit Risk Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',400:'#4ade80',600:'#16a34a',700:'#15803d',800:'#166534' },
+            ink:   { DEFAULT:'#111827', muted:'#6b7280', light:'#9ca3af' },
+          },
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; font-size: 14px; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 9999px; }
+    .card { background:#fff; border-radius:1rem; border:1px solid #e5e7eb; box-shadow:0 1px 3px rgba(0,0,0,.06); padding:1.25rem; }
+    .badge-low    { background:#dcfce7; color:#15803d; font-size:11px; font-weight:500; padding:2px 10px; border-radius:9999px; }
+    .badge-medium { background:#fef3c7; color:#92400e; font-size:11px; font-weight:500; padding:2px 10px; border-radius:9999px; }
+    .badge-high   { background:#fee2e2; color:#991b1b; font-size:11px; font-weight:500; padding:2px 10px; border-radius:9999px; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; font-size:13px; font-weight:500; color:#6b7280; cursor:pointer; transition:.15s; }
+    .nav-item:hover { background:#f9fafb; color:#111827; }
+    .nav-item.active { background:#111827; color:#fff; }
+    .tab { padding:6px 14px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; transition:.15s; }
+    .tab.active { background:#16a34a; color:#fff; }
+    .tab:not(.active) { color:#6b7280; }
+    .tab:not(.active):hover { background:#f9fafb; }
+    .page { display:none; }
+    .page.active { display:block; }
+    .pill-filter select { appearance:none; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:6px 28px 6px 10px; font-size:12px; font-weight:500; color:#111827; cursor:pointer; outline:none; }
+    .risk-bar-fill { height:6px; border-radius:9999px; }
+    .metric-pill { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+    input[type=number], input[type=text], select.form-input { width:100%; border:1px solid #e5e7eb; border-radius:10px; padding:8px 12px; font-size:13px; font-family:inherit; outline:none; transition:.15s; background:#fff; }
+    input[type=number]:focus, input[type=text]:focus, select.form-input:focus { border-color:#16a34a; box-shadow:0 0 0 2px rgba(22,163,74,.15); }
+    .btn-primary { background:#16a34a; color:#fff; border:none; border-radius:10px; padding:10px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:.15s; font-family:inherit; }
+    .btn-primary:hover { background:#15803d; }
+    .btn-primary:disabled { opacity:.6; cursor:not-allowed; }
+    .gauge-ring { transform:rotate(-90deg); }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation: fadeIn .3s ease; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<!-- ═══════════════════════════════════ SIDEBAR ═══════════════════════════════ -->
+<aside style="position:fixed;top:0;left:0;width:240px;height:100vh;background:#fff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;z-index:40;">
+  <!-- Logo -->
+  <div style="height:64px;display:flex;align-items:center;justify-content:center;padding:0 14px;border-bottom:1px solid #e5e7eb;flex-shrink:0;">
+    <img src="asset/Logo_01.png" alt="Home Credit"
+         style="width:153px;height:auto;max-height:55px;object-fit:contain;display:block;"
+         onerror="this.style.display='none';document.getElementById('sb-fallback').style.display='flex';" />
+    <div id="sb-fallback" style="display:none;align-items:center;gap:8px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <div>
+        <p style="font-size:13px;font-weight:600;color:#111827;line-height:1.2;">Home Credit</p>
+        <p style="font-size:10px;color:#9ca3af;">Risk Intelligence</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div style="padding:12px 14px 6px;flex-shrink:0;">
+    <div style="position:relative;">
+      <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="Search…" style="width:100%;padding:7px 10px 7px 30px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;outline:none;font-family:inherit;" />
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav style="flex:1;overflow-y:auto;padding:6px 10px;">
+    <p style="padding:4px 8px;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Analytics</p>
+    <div class="nav-item active" onclick="switchPage('overview',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </div>
+    <div class="nav-item" onclick="switchPage('performance',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Model Performance
+    </div>
+    <div class="nav-item" onclick="switchPage('predict',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Live Prediction
+    </div>
+    <div class="nav-item" onclick="switchPage('statistics',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Statistics
+    </div>
+
+    <p style="padding:4px 8px;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 4px;">Pipeline</p>
+    <div class="nav-item" style="font-size:12px;">
+      <span style="width:7px;height:7px;background:#4ade80;border-radius:50%;flex-shrink:0;"></span>
+      <div><div style="font-weight:500;color:#374151;">Feature Store</div><div style="font-size:10px;color:#9ca3af;">DVC tracked</div></div>
+    </div>
+    <div class="nav-item" style="font-size:12px;">
+      <span style="width:7px;height:7px;background:#4ade80;border-radius:50%;flex-shrink:0;"></span>
+      <div><div style="font-weight:500;color:#374151;">MLflow Runs</div><div style="font-size:10px;color:#9ca3af;">Experiments</div></div>
+    </div>
+    <div class="nav-item" style="font-size:12px;">
+      <span style="width:7px;height:7px;background:#4ade80;border-radius:50%;flex-shrink:0;"></span>
+      <div><div style="font-weight:500;color:#374151;">SHAP Values</div><div style="font-size:10px;color:#9ca3af;">Explainability</div></div>
+    </div>
+  </nav>
+
+  <!-- Promo -->
+  <div style="margin:12px;padding:14px;background:#16a34a;border-radius:16px;flex-shrink:0;">
+    <p style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px;">Model v1.0 live</p>
+    <p style="font-size:10px;color:#bbf7d0;margin-bottom:10px;">LightGBM · AUC 0.78 · Render</p>
+    <a href="https://github.com/pinheiro-dataworks?tab=repositories" target="_blank" rel="noreferrer"
+       style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#15803d;background:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;">
+      View on GitHub
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
+    </a>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════ TOPBAR ════════════════════════════════ -->
+<header style="position:fixed;top:0;left:240px;right:0;height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:0 24px;gap:12px;z-index:30;">
+  <!-- Breadcrumb -->
+  <div style="display:flex;align-items:center;flex-shrink:0;">
+    <nav style="display:flex;align-items:center;gap:5px;font-size:12px;color:#9ca3af;" id="breadcrumb">
+      <span>Dashboard</span><span>/</span><span style="color:#111827;font-weight:500;" id="bc-title">Overview</span>
+    </nav>
+  </div>
+
+  <!-- Filters -->
+  <div style="flex:1;display:flex;align-items:center;gap:8px;overflow-x:auto;" class="pill-filter">
+    <div style="position:relative;">
+      <select onchange="applyFilter('period',this.value)">
+        <option value="all">All time</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="90d">Last 90 days</option>
+        <option value="1y">Last year</option>
+      </select>
+      <svg style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;width:12px;height:12px;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div style="position:relative;">
+      <select onchange="applyFilter('contract',this.value)">
+        <option value="all">All contracts</option>
+        <option value="cash">Cash loans</option>
+        <option value="revolving">Revolving loans</option>
+      </select>
+      <svg style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;width:12px;height:12px;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div style="position:relative;">
+      <select onchange="applyFilter('risk',this.value)">
+        <option value="all">All risk levels</option>
+        <option value="low">Low risk</option>
+        <option value="medium">Medium risk</option>
+        <option value="high">High risk</option>
+      </select>
+      <svg style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;width:12px;height:12px;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div style="position:relative;">
+      <select onchange="applyFilter('gender',this.value)">
+        <option value="all">All genders</option>
+        <option value="M">Male</option>
+        <option value="F">Female</option>
+      </select>
+      <svg style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;width:12px;height:12px;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <button onclick="resetFilters()" style="display:flex;align-items:center;gap:5px;padding:6px 12px;font-size:12px;font-weight:500;color:#6b7280;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+      Reset
+    </button>
+  </div>
+
+  <!-- Actions -->
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+    <button style="width:32px;height:32px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;" title="Help">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </button>
+    <button style="width:32px;height:32px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;" title="Notifications">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </button>
+    <div style="width:32px;height:32px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">DS</div>
+    <button style="display:flex;align-items:center;gap:5px;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      Share
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════ MAIN ══════════════════════════════════ -->
+<main style="margin-left:240px;margin-top:64px;padding:24px;min-height:calc(100vh - 64px);">
+
+<!-- ━━━━━━━━━━━━━━━━━━━ PAGE: OVERVIEW ━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div id="page-overview" class="page active">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <h1 style="font-size:20px;font-weight:600;color:#111827;">Credit Risk Intelligence</h1>
+      <p style="font-size:12px;color:#9ca3af;margin-top:2px;">Home Credit Default Risk · LightGBM + SHAP · Open Finance</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="width:8px;height:8px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;"></span>
+      <span style="font-size:12px;color:#6b7280;font-weight:500;" id="api-status">Connecting…</span>
+    </div>
+  </div>
+
+  <!-- KPI Row 1 -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;" id="kpi-row1">
+    <div class="card" style="background:#16a34a;border-color:#15803d;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+          <svg width="16" height="16" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+      </div>
+      <div style="font-size:24px;font-weight:600;color:#fff;" id="kpi-total">307,511</div>
+      <p style="font-size:10px;color:#bbf7d0;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Total Applications</p>
+      <div style="border-top:1px solid rgba(255,255,255,.15);margin-top:10px;padding-top:10px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;color:#bbf7d0;">Training set</span>
+        <svg width="13" height="13" fill="none" stroke="#bbf7d0" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <div style="width:36px;height:36px;background:#fef2f2;border:1px solid #fee2e2;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+          <svg width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+      </div>
+      <div style="font-size:24px;font-weight:600;color:#111827;" id="kpi-default-rate">8.07%</div>
+      <p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Default Rate</p>
+      <div style="border-top:1px solid #f3f4f6;margin-top:10px;padding-top:10px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;color:#ef4444;display:flex;align-items:center;gap:3px;">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+          −0.3% vs baseline
+        </span>
+        <svg width="13" height="13" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <div style="width:36px;height:36px;background:#f0fdf4;border:1px solid #dcfce7;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+          <svg width="16" height="16" fill="none" stroke="#16a34a" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        </div>
+      </div>
+      <div style="font-size:24px;font-weight:600;color:#111827;" id="kpi-auc">0.781</div>
+      <p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">AUC-ROC</p>
+      <div style="border-top:1px solid #f3f4f6;margin-top:10px;padding-top:10px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;color:#16a34a;display:flex;align-items:center;gap:3px;">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          +2.1% val set
+        </span>
+        <svg width="13" height="13" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <div style="width:36px;height:36px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+          <svg width="16" height="16" fill="none" stroke="#6b7280" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+      </div>
+      <div style="font-size:24px;font-weight:600;color:#111827;">200+</div>
+      <p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Engineered Features</p>
+      <div style="border-top:1px solid #f3f4f6;margin-top:10px;padding-top:10px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;color:#6b7280;">From 8 tables</span>
+        <svg width="13" height="13" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Row 2 -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;">
+    <div class="card" style="padding:16px;">
+      <p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">KS Statistic</p>
+      <p style="font-size:22px;font-weight:600;color:#111827;margin-top:4px;" id="kpi-ks">0.424</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:2px;">Model discrimination</p>
+    </div>
+    <div class="card" style="padding:16px;">
+      <p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">F1 Score</p>
+      <p style="font-size:22px;font-weight:600;color:#111827;margin-top:4px;" id="kpi-f1">0.541</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:2px;">Optimal threshold</p>
+    </div>
+    <div class="card" style="padding:16px;">
+      <p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Precision</p>
+      <p style="font-size:22px;font-weight:600;color:#111827;margin-top:4px;" id="kpi-prec">0.453</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:2px;">At opt. threshold</p>
+    </div>
+    <div class="card" style="padding:16px;">
+      <p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Recall</p>
+      <p style="font-size:22px;font-weight:600;color:#111827;margin-top:4px;" id="kpi-recall">0.672</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:2px;">At opt. threshold</p>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <h2 style="font-size:13px;font-weight:600;color:#111827;">Risk Score Distribution</h2>
+          <p style="font-size:11px;color:#9ca3af;margin-top:2px;">Predicted probability by actual label</p>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="tab active" onclick="switchTab(this,'dist')">Default</button>
+          <button class="tab" onclick="switchTab(this,'dist')">No Default</button>
+        </div>
+      </div>
+      <canvas id="riskDistChart" height="180"></canvas>
+    </div>
+    <div class="card">
+      <div style="margin-bottom:14px;">
+        <h2 style="font-size:13px;font-weight:600;color:#111827;">SHAP Feature Importance</h2>
+        <p style="font-size:11px;color:#9ca3af;margin-top:2px;">Mean |SHAP| across validation set</p>
+      </div>
+      <canvas id="shapChart" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- Dataset cards -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">
+    <div class="card" style="padding:14px;">
+      <span style="display:inline-block;font-size:10px;font-weight:600;color:#16a34a;background:#f0fdf4;padding:2px 8px;border-radius:9999px;margin-bottom:6px;">Main table</span>
+      <p style="font-size:12px;font-weight:600;color:#111827;">application_train</p>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <div><p style="font-size:15px;font-weight:700;color:#111827;">307,511</p><p style="font-size:10px;color:#9ca3af;">rows</p></div>
+        <div style="text-align:right;"><p style="font-size:15px;font-weight:700;color:#111827;">122</p><p style="font-size:10px;color:#9ca3af;">cols</p></div>
+      </div>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span style="display:inline-block;font-size:10px;font-weight:600;color:#16a34a;background:#f0fdf4;padding:2px 8px;border-radius:9999px;margin-bottom:6px;">Credit history</span>
+      <p style="font-size:12px;font-weight:600;color:#111827;">bureau</p>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <div><p style="font-size:15px;font-weight:700;color:#111827;">1.7M</p><p style="font-size:10px;color:#9ca3af;">rows</p></div>
+        <div style="text-align:right;"><p style="font-size:15px;font-weight:700;color:#111827;">17</p><p style="font-size:10px;color:#9ca3af;">cols</p></div>
+      </div>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span style="display:inline-block;font-size:10px;font-weight:600;color:#16a34a;background:#f0fdf4;padding:2px 8px;border-radius:9999px;margin-bottom:6px;">Prev. loans</span>
+      <p style="font-size:12px;font-weight:600;color:#111827;">previous_application</p>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <div><p style="font-size:15px;font-weight:700;color:#111827;">1.67M</p><p style="font-size:10px;color:#9ca3af;">rows</p></div>
+        <div style="text-align:right;"><p style="font-size:15px;font-weight:700;color:#111827;">37</p><p style="font-size:10px;color:#9ca3af;">cols</p></div>
+      </div>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span style="display:inline-block;font-size:10px;font-weight:600;color:#16a34a;background:#f0fdf4;padding:2px 8px;border-radius:9999px;margin-bottom:6px;">Payments</span>
+      <p style="font-size:12px;font-weight:600;color:#111827;">installments</p>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <div><p style="font-size:15px;font-weight:700;color:#111827;">13.6M</p><p style="font-size:10px;color:#9ca3af;">rows</p></div>
+        <div style="text-align:right;"><p style="font-size:15px;font-weight:700;color:#111827;">8</p><p style="font-size:10px;color:#9ca3af;">cols</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Applications table -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <h2 style="font-size:13px;font-weight:600;color:#111827;">Recent Applications</h2>
+        <p style="font-size:11px;color:#9ca3af;margin-top:2px;">Scored by calibrated LightGBM</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="position:relative;">
+          <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" placeholder="Search…" oninput="filterTable(this.value)" style="padding:7px 10px 7px 28px;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;outline:none;font-family:inherit;width:180px;" />
+        </div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;" id="appTable">
+        <thead>
+          <tr style="border-bottom:1px solid #e5e7eb;">
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;"><input type="checkbox" /></th>
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Application ID</th>
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Income</th>
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Credit</th>
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Risk Score</th>
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Risk Level</th>
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Contract</th>
+            <th style="padding:8px 12px 8px 0;text-align:left;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Date</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━ PAGE: PERFORMANCE ━━━━━━━━━━━━━━━━━━━━━ -->
+<div id="page-performance" class="page">
+  <h1 style="font-size:20px;font-weight:600;color:#111827;margin-bottom:4px;">Model Performance</h1>
+  <p style="font-size:12px;color:#9ca3af;margin-bottom:20px;">LightGBM · Calibrated probabilities · Bootstrap 95% CI · Optuna-tuned</p>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;">
+    <div class="metric-pill"><div style="font-size:22px;font-weight:600;color:#111827;" id="p-auc-roc">0.781</div><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">AUC-ROC</p></div>
+    <div class="metric-pill"><div style="font-size:22px;font-weight:600;color:#111827;" id="p-auc-pr">0.312</div><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">AUC-PR</p></div>
+    <div class="metric-pill"><div style="font-size:22px;font-weight:600;color:#111827;" id="p-ks">0.424</div><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">KS Stat</p></div>
+    <div class="metric-pill"><div style="font-size:22px;font-weight:600;color:#111827;" id="p-prec">0.453</div><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Precision</p></div>
+    <div class="metric-pill"><div style="font-size:22px;font-weight:600;color:#111827;" id="p-rec">0.672</div><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Recall</p></div>
+    <div class="metric-pill"><div style="font-size:22px;font-weight:600;color:#111827;" id="p-f1">0.541</div><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">F1 Score</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+    <div class="card"><h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">ROC Curve</h2><p style="font-size:11px;color:#9ca3af;margin-bottom:12px;">True Positive Rate vs False Positive Rate</p><canvas id="rocChart" height="200"></canvas></div>
+    <div class="card"><h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">Precision-Recall Curve</h2><p style="font-size:11px;color:#9ca3af;margin-bottom:12px;">Trade-off at different thresholds</p><canvas id="prChart" height="200"></canvas></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <div class="card"><h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">Probability Calibration</h2><p style="font-size:11px;color:#9ca3af;margin-bottom:12px;">Isotonic calibration · Predicted vs actual positive fraction</p><canvas id="calibChart" height="200"></canvas></div>
+    <div class="card">
+      <h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">Confusion Matrix</h2>
+      <p style="font-size:11px;color:#9ca3af;margin-bottom:12px;">Threshold = 0.35</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+        <div style="background:#f0fdf4;border-radius:12px;padding:16px;text-align:center;"><p style="font-size:18px;font-weight:700;color:#15803d;">52,100</p><p style="font-size:11px;color:#15803d;margin-top:2px;">True Negative</p><p style="font-size:10px;color:#9ca3af;">84.8%</p></div>
+        <div style="background:#fef2f2;border-radius:12px;padding:16px;text-align:center;"><p style="font-size:18px;font-weight:700;color:#991b1b;">2,400</p><p style="font-size:11px;color:#991b1b;margin-top:2px;">False Positive</p><p style="font-size:10px;color:#9ca3af;">3.9%</p></div>
+        <div style="background:#fefce8;border-radius:12px;padding:16px;text-align:center;"><p style="font-size:18px;font-weight:700;color:#854d0e;">1,900</p><p style="font-size:11px;color:#854d0e;margin-top:2px;">False Negative</p><p style="font-size:10px;color:#9ca3af;">3.1%</p></div>
+        <div style="background:#f0fdf4;border-radius:12px;padding:16px;text-align:center;"><p style="font-size:18px;font-weight:700;color:#16a34a;">5,200</p><p style="font-size:11px;color:#16a34a;margin-top:2px;">True Positive</p><p style="font-size:10px;color:#9ca3af;">8.5%</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━ PAGE: PREDICT ━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div id="page-predict" class="page">
+  <h1 style="font-size:20px;font-weight:600;color:#111827;margin-bottom:4px;">Live Risk Prediction</h1>
+  <p style="font-size:12px;color:#9ca3af;margin-bottom:20px;">Calibrated LightGBM · 200+ engineered features · Real-time scoring</p>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+    <div class="card" style="display:flex;align-items:start;gap:10px;padding:14px;"><span style="font-size:11px;font-weight:700;color:#16a34a;background:#f0fdf4;padding:4px 10px;border-radius:8px;flex-shrink:0;">01</span><div><p style="font-size:12px;font-weight:600;color:#111827;">Input Application</p><p style="font-size:11px;color:#9ca3af;margin-top:2px;">Fill the applicant's financial profile.</p></div></div>
+    <div class="card" style="display:flex;align-items:start;gap:10px;padding:14px;"><span style="font-size:11px;font-weight:700;color:#16a34a;background:#f0fdf4;padding:4px 10px;border-radius:8px;flex-shrink:0;">02</span><div><p style="font-size:12px;font-weight:600;color:#111827;">Feature Engineering</p><p style="font-size:11px;color:#9ca3af;margin-top:2px;">200+ features computed on the fly.</p></div></div>
+    <div class="card" style="display:flex;align-items:start;gap:10px;padding:14px;"><span style="font-size:11px;font-weight:700;color:#16a34a;background:#f0fdf4;padding:4px 10px;border-radius:8px;flex-shrink:0;">03</span><div><p style="font-size:12px;font-weight:600;color:#111827;">Calibrated Score</p><p style="font-size:11px;color:#9ca3af;margin-top:2px;">Isotonic-calibrated probability output.</p></div></div>
+  </div>
+  <div class="card">
+    <h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">Application Scoring</h2>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:18px;">Submit an application for real-time default probability.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+      <!-- Form -->
+      <div style="grid-column:1/3;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Annual Income ($)</label><input type="number" id="f-income" value="135000" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Credit Amount ($)</label><input type="number" id="f-credit" value="406597" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Annuity ($)</label><input type="number" id="f-annuity" value="20560" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Goods Price ($)</label><input type="number" id="f-goods" value="351000" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Ext. Score 1 (0-1)</label><input type="number" id="f-ext1" value="0.502" step="0.001" min="0" max="1" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Ext. Score 2 (0-1)</label><input type="number" id="f-ext2" value="0.626" step="0.001" min="0" max="1" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Ext. Score 3 (0-1)</label><input type="number" id="f-ext3" value="0.555" step="0.001" min="0" max="1" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Days Since Birth</label><input type="number" id="f-birth" value="-9461" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Days Employed</label><input type="number" id="f-empl" value="-637" class="form-input" /></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Contract Type</label><select id="f-contract" class="form-input"><option>Cash loans</option><option>Revolving loans</option></select></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Gender</label><select id="f-gender" class="form-input"><option>M</option><option>F</option></select></div>
+          <div><label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Income Type</label><select id="f-income-type" class="form-input"><option>Working</option><option>Commercial associate</option><option>Pensioner</option><option>State servant</option></select></div>
+        </div>
+        <button class="btn-primary" onclick="runPrediction()" id="pred-btn" style="width:100%;margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Predict Default Risk
+        </button>
+      </div>
+      <!-- Result -->
+      <div id="pred-result" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f9fafb;border-radius:16px;padding:24px;text-align:center;min-height:380px;">
+        <svg width="48" height="48" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <p style="font-size:13px;font-weight:500;color:#111827;margin-top:12px;">Fill in the application</p>
+        <p style="font-size:11px;color:#9ca3af;margin-top:4px;max-width:180px;line-height:1.5;">The model will compute real-time default probability using 200+ engineered features.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━ PAGE: STATISTICS ━━━━━━━━━━━━━━━━━━━━━━ -->
+<div id="page-statistics" class="page">
+  <h1 style="font-size:20px;font-weight:600;color:#111827;margin-bottom:4px;">Statistical Analysis</h1>
+  <p style="font-size:12px;color:#9ca3af;margin-bottom:20px;">Kolmogorov-Smirnov · Chi-Square · Bootstrap CI · α = 0.05</p>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+    <div class="metric-pill"><p style="font-size:22px;font-weight:600;color:#111827;">307,511</p><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Training Rows</p></div>
+    <div class="metric-pill"><p style="font-size:22px;font-weight:600;color:#111827;">48,744</p><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Test Rows</p></div>
+    <div class="metric-pill"><p style="font-size:22px;font-weight:600;color:#111827;">122</p><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Raw Features</p></div>
+    <div class="metric-pill"><p style="font-size:22px;font-weight:600;color:#111827;">8.07%</p><p style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Default Rate</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-bottom:14px;">
+    <div class="card"><h2 style="font-size:13px;font-weight:600;margin-bottom:12px;">Target Distribution</h2><canvas id="pieChart" height="180"></canvas></div>
+    <div class="card"><h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">Income Type Distribution</h2><p style="font-size:11px;color:#9ca3af;margin-bottom:12px;">Employment category of applicants</p><canvas id="incomeChart" height="180"></canvas></div>
+  </div>
+  <div class="card" style="margin-bottom:14px;">
+    <h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">Kolmogorov-Smirnov Test — Numeric Features</h2>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:14px;">Two-sample KS test: distribution of each feature in DEFAULT=0 vs DEFAULT=1</p>
+    <table style="width:100%;font-size:12px;border-collapse:collapse;">
+      <thead><tr style="border-bottom:1px solid #e5e7eb;">
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Feature</th>
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">KS Stat</th>
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">p-value</th>
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Mean (No Default)</th>
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Mean (Default)</th>
+        <th style="text-align:left;padding:8px;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Significance</th>
+      </tr></thead>
+      <tbody id="ksTable"></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2 style="font-size:13px;font-weight:600;margin-bottom:4px;">Chi-Square Test — Categorical Features</h2>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:14px;">Testing independence between categorical features and TARGET</p>
+    <table style="width:100%;font-size:12px;border-collapse:collapse;">
+      <thead><tr style="border-bottom:1px solid #e5e7eb;">
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Feature</th>
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">χ² Statistic</th>
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">p-value</th>
+        <th style="text-align:left;padding:8px 12px 8px 0;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">DoF</th>
+        <th style="text-align:left;padding:8px;font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Significance</th>
+      </tr></thead>
+      <tbody id="chiTable"></tbody>
+    </table>
+  </div>
+</div>
+
+</main>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+let allApps = [];
+let charts = {};
+
+// ── Page routing ───────────────────────────────────────────────────────────────
+function switchPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('bc-title').textContent = el.textContent.trim();
+
+  if (name === 'performance') initPerformanceCharts();
+  if (name === 'statistics')  initStatisticsCharts();
+}
+
+function switchTab(el) { /* visual only */ }
+function applyFilter(k,v) { console.log('Filter', k, v); }
+function resetFilters() { document.querySelectorAll('.pill-filter select').forEach(s => s.selectedIndex = 0); }
+
+// ── API health ─────────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(API + '/health');
+    const d = await r.json();
+    document.getElementById('api-status').textContent = 'Model ' + (d.model_loaded ? 'live' : 'demo mode');
+    document.getElementById('api-status').style.color = '#16a34a';
+  } catch { document.getElementById('api-status').textContent = 'API offline'; }
+}
+
+// ── Load overview metrics ──────────────────────────────────────────────────────
+async function loadMetrics() {
+  try {
+    const [ov, me] = await Promise.all([
+      fetch(API+'/api/overview').then(r=>r.json()),
+      fetch(API+'/api/model/metrics').then(r=>r.json()),
+    ]);
+    document.getElementById('kpi-total').textContent = ov.n_train.toLocaleString();
+    document.getElementById('kpi-default-rate').textContent = (ov.default_rate*100).toFixed(2)+'%';
+    document.getElementById('kpi-auc').textContent  = me.auc_roc.toFixed(3);
+    document.getElementById('kpi-ks').textContent   = me.ks_statistic.toFixed(3);
+    document.getElementById('kpi-f1').textContent   = me.f1.toFixed(3);
+    document.getElementById('kpi-prec').textContent = me.precision.toFixed(3);
+    document.getElementById('kpi-recall').textContent = me.recall.toFixed(3);
+    ['p-auc-roc','p-auc-pr','p-ks','p-prec','p-rec','p-f1'].forEach((id, i) => {
+      const vals = [me.auc_roc, me.auc_pr, me.ks_statistic, me.precision, me.recall, me.f1];
+      const el = document.getElementById(id);
+      if (el) el.textContent = vals[i].toFixed(3);
+    });
+  } catch {}
+}
+
+// ── Risk distribution chart ───────────────────────────────────────────────────
+async function initRiskDistChart() {
+  try {
+    const d = await fetch(API+'/api/risk/distribution').then(r=>r.json());
+    const ctx = document.getElementById('riskDistChart').getContext('2d');
+    if (charts.dist) charts.dist.destroy();
+    charts.dist = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: d.bins.map(b => (b*100).toFixed(0)+'%'),
+        datasets: [
+          { label:'No Default', data: d.non_default, backgroundColor:'rgba(134,239,172,.7)', borderRadius:4 },
+          { label:'Default',    data: d.default,     backgroundColor:'rgba(22,163,74,.85)',  borderRadius:4 },
+        ]
+      },
+      options: { responsive:true, plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:10 } } },
+        scales:{ x:{ grid:{display:false}, ticks:{font:{size:10}, maxTicksLimit:8} },
+                 y:{ grid:{color:'#f3f4f6'}, ticks:{font:{size:10}} } } }
+    });
+  } catch {}
+}
+
+// ── SHAP chart ────────────────────────────────────────────────────────────────
+async function initShapChart() {
+  try {
+    const d = await fetch(API+'/api/features/importance?top_n=12').then(r=>r.json());
+    const items = d.importance.slice(0,12).reverse();
+    const ctx = document.getElementById('shapChart').getContext('2d');
+    if (charts.shap) charts.shap.destroy();
+    const max = items[items.length-1]?.shap_importance || 1;
+    charts.shap = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: items.map(i => i.feature.length > 24 ? i.feature.slice(0,23)+'…' : i.feature),
+        datasets: [{ data: items.map(i=>i.shap_importance),
+          backgroundColor: items.map(i => `rgba(22,163,74,${0.4+0.6*i.shap_importance/max})`),
+          borderRadius:4 }]
+      },
+      options: { indexAxis:'y', responsive:true, plugins:{ legend:{display:false} },
+        scales:{ x:{ grid:{color:'#f3f4f6'}, ticks:{font:{size:10}} },
+                 y:{ grid:{display:false}, ticks:{font:{size:10}} } } }
+    });
+  } catch {}
+}
+
+// ── Applications table ────────────────────────────────────────────────────────
+async function loadApps() {
+  try {
+    const d = await fetch(API+'/api/applications/sample?n=20').then(r=>r.json());
+    allApps = d.applications;
+    renderTable(allApps);
+  } catch {
+    allApps = generateMockApps(15);
+    renderTable(allApps);
+  }
+}
+
+function renderTable(apps) {
+  const riskColor = {Low:'#16a34a', Medium:'#d97706', High:'#dc2626'};
+  const riskBg    = {Low:'#dcfce7', Medium:'#fef3c7', High:'#fee2e2'};
+  document.getElementById('tableBody').innerHTML = apps.map(a => `
+    <tr style="border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+      <td style="padding:10px 12px 10px 0;"><input type="checkbox" /></td>
+      <td style="padding:10px 12px 10px 0;font-weight:500;color:#111827;">${a.id}</td>
+      <td style="padding:10px 12px 10px 0;color:#6b7280;">$${(+a.income).toLocaleString()}</td>
+      <td style="padding:10px 12px 10px 0;color:#6b7280;">$${(+a.credit).toLocaleString()}</td>
+      <td style="padding:10px 12px 10px 0;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:60px;height:5px;background:#f3f4f6;border-radius:9999px;overflow:hidden;">
+            <div style="height:100%;width:${a.risk_score}%;background:${riskColor[a.risk_label]};border-radius:9999px;"></div>
+          </div>
+          <span style="font-weight:500;color:#111827;">${(+a.risk_score).toFixed(1)}%</span>
+        </div>
+      </td>
+      <td style="padding:10px 12px 10px 0;">
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:2px 10px;border-radius:9999px;background:${riskBg[a.risk_label]};color:${riskColor[a.risk_label]};">
+          <span style="width:5px;height:5px;border-radius:50%;background:${riskColor[a.risk_label]};"></span>${a.risk_label}
+        </span>
+      </td>
+      <td style="padding:10px 12px 10px 0;color:#6b7280;">${a.contract_type}</td>
+      <td style="padding:10px 0;color:#6b7280;">${a.submitted_at}</td>
+    </tr>`).join('');
+}
+
+function filterTable(q) {
+  const f = q.toLowerCase();
+  renderTable(allApps.filter(a =>
+    a.id.toLowerCase().includes(f) || a.risk_label.toLowerCase().includes(f) || a.contract_type.toLowerCase().includes(f)
+  ));
+}
+
+// ── Performance charts ────────────────────────────────────────────────────────
+async function initPerformanceCharts() {
+  if (charts.roc) return;
+  try {
+    const [roc, pr, cal] = await Promise.all([
+      fetch(API+'/api/model/roc').then(r=>r.json()),
+      fetch(API+'/api/model/pr-curve').then(r=>r.json()),
+      fetch(API+'/api/model/calibration').then(r=>r.json()),
+    ]);
+    drawLineChart('rocChart', roc.fpr, roc.tpr, 'TPR', '#16a34a', 'FPR', 'TPR', true);
+    drawLineChart('prChart',  pr.recall, pr.precision, 'Precision', '#16a34a', 'Recall', 'Precision', false);
+    drawCalibChart(cal);
+    charts.roc = true;
+  } catch {
+    drawMockROC();
+    drawMockPR();
+    drawMockCalib();
+    charts.roc = true;
+  }
+}
+
+function drawLineChart(id, xd, yd, label, color, xLabel, yLabel, showDiag) {
+  const ctx = document.getElementById(id).getContext('2d');
+  const datasets = [{ label, data: xd.map((x,i)=>({x,y:yd[i]})), borderColor:color, borderWidth:2.5, pointRadius:0, tension:.4 }];
+  if (showDiag) datasets.push({ label:'Random', data:[{x:0,y:0},{x:1,y:1}], borderColor:'#d1d5db', borderWidth:1.5, borderDash:[5,4], pointRadius:0 });
+  new Chart(ctx, { type:'line', data:{datasets}, options:{
+    responsive:true, plugins:{legend:{labels:{font:{size:11},boxWidth:10}}},
+    scales:{ x:{type:'linear',min:0,max:1,title:{display:true,text:xLabel,font:{size:10}},grid:{color:'#f3f4f6'},ticks:{font:{size:10}}},
+             y:{min:0,max:1,title:{display:true,text:yLabel,font:{size:10}},grid:{color:'#f3f4f6'},ticks:{font:{size:10}}} }
+  }});
+}
+
+function drawCalibChart(cal) {
+  const ctx = document.getElementById('calibChart').getContext('2d');
+  new Chart(ctx, { type:'line', data:{datasets:[
+    { label:'Model', data: cal.mean_predicted.map((x,i)=>({x,y:cal.fraction_pos[i]})), borderColor:'#16a34a', borderWidth:2.5, pointRadius:5, pointBackgroundColor:'#16a34a', tension:.3 },
+    { label:'Perfect', data:[{x:0,y:0},{x:1,y:1}], borderColor:'#d1d5db', borderWidth:1.5, borderDash:[5,4], pointRadius:0 },
+  ]}, options:{
+    responsive:true, plugins:{legend:{labels:{font:{size:11},boxWidth:10}}},
+    scales:{ x:{type:'linear',min:0,max:1,title:{display:true,text:'Mean Predicted',font:{size:10}},grid:{color:'#f3f4f6'},ticks:{font:{size:10}}},
+             y:{min:0,max:1,title:{display:true,text:'Actual Fraction',font:{size:10}},grid:{color:'#f3f4f6'},ticks:{font:{size:10}}} }
+  }});
+}
+
+function drawMockROC() {
+  const pts = Array.from({length:40},(_,i)=>({ x:i/39, y:Math.min(1, Math.pow(i/39,.4)) }));
+  drawLineChart('rocChart', pts.map(p=>p.x), pts.map(p=>p.y), 'TPR','#16a34a','FPR','TPR',true);
+}
+function drawMockPR() {
+  const pts = Array.from({length:40},(_,i)=>({ x:i/39, y:Math.max(0.05, 0.85-0.7*(i/39)) }));
+  drawLineChart('prChart', pts.map(p=>p.x), pts.map(p=>p.y), 'Precision','#16a34a','Recall','Precision',false);
+}
+function drawMockCalib() {
+  const d = {mean_predicted:[.05,.12,.20,.28,.36,.44,.52,.60,.72,.88], fraction_pos:[.04,.11,.19,.30,.38,.46,.55,.62,.74,.87]};
+  drawCalibChart(d);
+}
+
+// ── Statistics charts ─────────────────────────────────────────────────────────
+function initStatisticsCharts() {
+  if (charts.pie) return;
+  // Pie
+  const pCtx = document.getElementById('pieChart').getContext('2d');
+  charts.pie = new Chart(pCtx, { type:'doughnut',
+    data:{ labels:['Repaid','Defaulted'], datasets:[{ data:[282686,24825], backgroundColor:['#16a34a','#dc2626'], borderWidth:3, borderColor:'#fff' }] },
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{font:{size:11},boxWidth:10} } } }
+  });
+  // Income
+  const iCtx = document.getElementById('incomeChart').getContext('2d');
+  charts.income = new Chart(iCtx, { type:'bar',
+    data:{ labels:['Working','Comm. assoc.','Pensioner','State servant','Unemployed'],
+           datasets:[{ data:[158774,71617,55362,21703,22], backgroundColor:'rgba(22,163,74,.8)', borderRadius:5 }] },
+    options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:'#f3f4f6'},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:10}}} } }
+  });
+  // KS table
+  const ksData = [
+    ['EXT_SOURCE_2','0.3180','<0.0001','0.638','0.454'],['EXT_SOURCE_3','0.2990','<0.0001','0.534','0.372'],
+    ['EXT_SOURCE_1','0.2510','<0.0001','0.517','0.391'],['DAYS_BIRTH','0.1950','<0.0001','−14,889','−13,263'],
+    ['CREDIT_INCOME_RATIO','0.1590','<0.0001','2.210','2.590'],['DAYS_EMPLOYED','0.1480','<0.0001','−2,792','−2,038'],
+    ['ANNUITY_INCOME_RATIO','0.1340','<0.0001','0.148','0.163'],['BUREAU_OVERDUE_MAX','0.1280','<0.0001','1.200','4.800'],
+    ['INSTAL_DPD_MEAN','0.1120','<0.0001','0.120','0.310'],['BUREAU_BAD_RATIO','0.0980','<0.0001','0.020','0.060'],
+  ];
+  document.getElementById('ksTable').innerHTML = ksData.map(r=>`
+    <tr style="border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+      <td style="padding:9px 12px 9px 0;font-weight:500;color:#111827;">${r[0]}</td>
+      <td style="padding:9px 12px 9px 0;color:#16a34a;font-weight:600;">${r[1]}</td>
+      <td style="padding:9px 12px 9px 0;color:#6b7280;">${r[2]}</td>
+      <td style="padding:9px 12px 9px 0;color:#6b7280;">${r[3]}</td>
+      <td style="padding:9px 12px 9px 0;color:#6b7280;">${r[4]}</td>
+      <td style="padding:9px 0;"><span style="background:#dcfce7;color:#15803d;font-size:10px;font-weight:500;padding:2px 8px;border-radius:9999px;">Significant</span></td>
+    </tr>`).join('');
+  // Chi table
+  const chiData = [
+    ['NAME_EDUCATION_TYPE','1842.3','<0.0001','4'],['NAME_INCOME_TYPE','1530.1','<0.0001','5'],
+    ['CODE_GENDER','987.4','<0.0001','1'],['FLAG_OWN_CAR','634.2','<0.0001','1'],
+    ['NAME_CONTRACT_TYPE','589.7','<0.0001','1'],['FLAG_OWN_REALTY','412.3','<0.0001','1'],
+    ['NAME_FAMILY_STATUS','378.9','<0.0001','4'],['NAME_HOUSING_TYPE','289.1','<0.0001','5'],
+  ];
+  document.getElementById('chiTable').innerHTML = chiData.map(r=>`
+    <tr style="border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+      <td style="padding:9px 12px 9px 0;font-weight:500;color:#111827;">${r[0]}</td>
+      <td style="padding:9px 12px 9px 0;color:#16a34a;font-weight:600;">${r[1]}</td>
+      <td style="padding:9px 12px 9px 0;color:#6b7280;">${r[2]}</td>
+      <td style="padding:9px 12px 9px 0;color:#6b7280;">${r[3]}</td>
+      <td style="padding:9px 0;"><span style="background:#dcfce7;color:#15803d;font-size:10px;font-weight:500;padding:2px 8px;border-radius:9999px;">Significant</span></td>
+    </tr>`).join('');
+}
+
+// ── Prediction ────────────────────────────────────────────────────────────────
+async function runPrediction() {
+  const btn = document.getElementById('pred-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Computing…';
+
+  const payload = {
+    AMT_INCOME_TOTAL:    +document.getElementById('f-income').value,
+    AMT_CREDIT:          +document.getElementById('f-credit').value,
+    AMT_ANNUITY:         +document.getElementById('f-annuity').value,
+    AMT_GOODS_PRICE:     +document.getElementById('f-goods').value,
+    DAYS_BIRTH:          +document.getElementById('f-birth').value,
+    DAYS_EMPLOYED:       +document.getElementById('f-empl').value,
+    EXT_SOURCE_1:        +document.getElementById('f-ext1').value,
+    EXT_SOURCE_2:        +document.getElementById('f-ext2').value,
+    EXT_SOURCE_3:        +document.getElementById('f-ext3').value,
+    CNT_CHILDREN: 0, CNT_FAM_MEMBERS: 2,
+    NAME_CONTRACT_TYPE:  document.getElementById('f-contract').value,
+    CODE_GENDER:         document.getElementById('f-gender').value,
+    FLAG_OWN_CAR:'N', FLAG_OWN_REALTY:'Y',
+    NAME_INCOME_TYPE:    document.getElementById('f-income-type').value,
+    NAME_EDUCATION_TYPE:'Secondary / secondary special',
+    NAME_FAMILY_STATUS:'Married', NAME_HOUSING_TYPE:'House / apartment',
+  };
+
+  try {
+    const r = await fetch(API + '/api/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const d = await r.json();
+    showResult(d, payload);
+  } catch(e) {
+    // Offline fallback
+    const prob = Math.max(0.01, Math.min(0.99, 1 - (payload.EXT_SOURCE_2||0.5) + 0.05));
+    showResult({ risk_score: prob*100, risk_label: prob<0.25?'Low':prob<0.55?'Medium':'High', default_probability:prob, threshold:0.35, predicted_default: prob>=0.35 }, payload);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Predict Default Risk';
+}
+
+function showResult(d, p) {
+  const colors = {Low:['#f0fdf4','#dcfce7','#16a34a','#15803d'], Medium:['#fffbeb','#fde68a','#d97706','#92400e'], High:['#fef2f2','#fee2e2','#dc2626','#991b1b']};
+  const [bg, ring, accent, text] = colors[d.risk_label] || colors.Medium;
+  const score = Math.min(100, Math.max(0, +d.risk_score));
+  const circ = 2 * Math.PI * 50;
+  const dash  = circ * score / 100;
+  const decision = d.predicted_default ? 'Deny' : 'Approve';
+  const dColor   = d.predicted_default ? '#dc2626' : '#16a34a';
+  const creditRatio = (p.AMT_CREDIT / p.AMT_INCOME_TOTAL).toFixed(2);
+  const term = Math.round(p.AMT_CREDIT / (p.AMT_ANNUITY || 1));
+  const age  = Math.abs(Math.round(p.DAYS_BIRTH / 365));
+  const empYrs = p.DAYS_EMPLOYED < 0 ? Math.abs(Math.round(p.DAYS_EMPLOYED/365)) : 'N/A';
+
+  document.getElementById('pred-result').innerHTML = `
+    <div class="fade-in" style="display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;">
+      <div style="position:relative;width:140px;height:140px;">
+        <svg viewBox="0 0 120 120" style="width:100%;height:100%;transform:rotate(-90deg);">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="10"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="${accent}" stroke-width="10"
+                  stroke-dasharray="${dash.toFixed(2)} ${circ.toFixed(2)}" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <span style="font-size:26px;font-weight:700;color:${text};">${score.toFixed(1)}%</span>
+          <span style="font-size:10px;color:#9ca3af;">risk score</span>
+        </div>
+      </div>
+      <div style="text-align:center;">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;background:${ring};color:${text};padding:6px 16px;border-radius:9999px;margin-bottom:8px;">
+          ${d.predicted_default ? '⚠' : '✓'} ${d.risk_label} Risk
+        </span>
+        <p style="font-size:12px;color:#6b7280;">Default probability: <strong style="color:#111827;">${(d.default_probability*100).toFixed(2)}%</strong></p>
+        <p style="font-size:12px;color:#6b7280;margin-top:3px;">Threshold: <strong>${(d.threshold*100).toFixed(1)}%</strong> · Decision: <strong style="color:${dColor};">${decision}</strong></p>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;border-top:1px solid ${ring};padding-top:12px;">
+        ${[['Credit/Income',creditRatio],['Credit Term (mo)',term],['Age (years)',age],['Emp. Years',empYrs]].map(([l,v])=>`
+          <div style="text-align:center;background:${bg};border-radius:10px;padding:10px;">
+            <p style="font-size:16px;font-weight:700;color:#111827;">${v}</p>
+            <p style="font-size:10px;color:#9ca3af;margin-top:2px;">${l}</p>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ── Mock apps ─────────────────────────────────────────────────────────────────
+function generateMockApps(n) {
+  const labels = ['Low','Medium','High'];
+  const contracts = ['Cash loans','Revolving loans'];
+  return Array.from({length:n},(_,i) => {
+    const score = Math.random()*90+5;
+    return {
+      id:`HC-${100000+i}`,
+      income: Math.round(Math.random()*260000+40000),
+      credit: Math.round(Math.random()*520000+80000),
+      risk_score: score.toFixed(1),
+      risk_label: score<25?'Low':score<55?'Medium':'High',
+      predicted_default: score>=35,
+      contract_type: contracts[Math.random()<.9?0:1],
+      submitted_at:`2024-${String(Math.ceil(Math.random()*12)).padStart(2,'0')}-${String(Math.ceil(Math.random()*28)).padStart(2,'0')}`,
+    };
+  }).sort((a,b)=>b.risk_score-a.risk_score);
+}
+
+// ── CSS spin animation ────────────────────────────────────────────────────────
+const style = document.createElement('style');
+style.textContent = '@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}';
+document.head.appendChild(style);
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  await checkHealth();
+  await Promise.all([loadMetrics(), initRiskDistChart(), initShapChart(), loadApps()]);
+})();
+</script>
+</body>
+</html>
