@@ -53,6 +53,7 @@ dashboard/node_modules/
 dashboard/.next/
 dashboard/out/
 dashboard/.env.local
+dashboard/next-env.d.ts
 
 # Docker
 .dockerignore
