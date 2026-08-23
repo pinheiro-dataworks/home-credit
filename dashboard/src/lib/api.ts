@@ -17,6 +17,9 @@ export const api = {
   statistics:       () => client.get("/api/statistics"),
   sampleApplications:(n = 10) => client.get(`/api/applications/sample?n=${n}`),
   predict:          (data: Record<string, unknown>) => client.post("/api/predict", data),
+  fairness:         () => client.get("/api/model/fairness"),
+  errorAnalysis:    () => client.get("/api/model/error-analysis"),
+  drift:            () => client.get("/api/model/drift"),
 };
 
 export type { AxiosResponse } from "axios";

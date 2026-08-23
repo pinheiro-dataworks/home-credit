@@ -38,6 +38,7 @@ stages:
       - data/processed/train_features.parquet
       - src/models/train.py
       - src/models/evaluate.py
+      - src/models/fairness.py
       - src/utils/stats.py
       - params.yaml
     params:
@@ -65,3 +66,12 @@ stages:
       - models/artifacts/threshold.json
     outs:
       - data/processed/submission.csv
+
+  drift:
+    cmd: python pipeline.py --stage drift
+    deps:
+      - data/processed/train_features.parquet
+      - data/processed/test_features.parquet
+      - src/models/drift.py
+    outs:
+      - models/artifacts/drift_report.json

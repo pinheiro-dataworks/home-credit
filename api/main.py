@@ -119,6 +119,23 @@ async def statistics():
     return JSONResponse(_p().get_statistical_report())
 
 
+# ── Responsible AI: fairness, error analysis, drift ──────────────────────────
+
+@app.get("/api/model/fairness", tags=["Responsible AI"])
+async def fairness():
+    return JSONResponse(_p().get_fairness_report())
+
+
+@app.get("/api/model/error-analysis", tags=["Responsible AI"])
+async def error_analysis():
+    return JSONResponse(_p().get_error_analysis())
+
+
+@app.get("/api/model/drift", tags=["Responsible AI"])
+async def drift():
+    return JSONResponse(_p().get_drift_report())
+
+
 # ── Real-time prediction ──────────────────────────────────────────────────────
 
 @app.post("/api/predict", response_model=PredictionResponse, tags=["Prediction"])

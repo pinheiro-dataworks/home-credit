@@ -36,7 +36,45 @@ from src.features.engineering import build_features, encode_and_impute
 from src.utils.stats import build_statistical_report
 from src.models.train import train
 from src.models.evaluate import build_eval_report
+from src.models.fairness import build_fairness_report, build_error_analysis
+from src.models.drift import build_drift_report
 import joblib
+
+# Raw demographic/categorical columns used to slice fairness & error-analysis
+# segments. DAYS_BIRTH is binned into age_band below rather than used raw.
+FAIRNESS_SEGMENT_COLS = ["CODE_GENDER", "NAME_EDUCATION_TYPE", "NAME_INCOME_TYPE"]
+AGE_BAND_EDGES  = [0, 25, 35, 45, 55, 65, 200]
+AGE_BAND_LABELS = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
+
+# Features checked for drift (top model inputs + the sensitive attributes above)
+DRIFT_FEATURE_CANDIDATES = [
+    "EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3", "DAYS_BIRTH", "DAYS_EMPLOYED",
+    "AMT_INCOME_TOTAL", "AMT_CREDIT", "AMT_ANNUITY", "AMT_GOODS_PRICE",
+    "CODE_GENDER", "NAME_EDUCATION_TYPE", "NAME_INCOME_TYPE",
+]
+
+
+def _build_fairness_segments(df_raw_slice: pd.DataFrame, enc_state: dict) -> dict:
+    """Decode label-encoded sensitive columns back to raw categories and derive
+    an age band from DAYS_BIRTH, for use as fairness/error-analysis segments."""
+    segments = {}
+    encoders = enc_state.get("label_encoders", {})
+    for col in FAIRNESS_SEGMENT_COLS:
+        if col not in df_raw_slice.columns:
+            continue
+        enc = encoders.get(col)
+        if enc is None:
+            continue
+        codes = df_raw_slice[col].astype(int).values
+        segments[col] = pd.Series(enc.inverse_transform(codes))
+
+    if "DAYS_BIRTH" in df_raw_slice.columns:
+        age_years = -df_raw_slice["DAYS_BIRTH"].values / 365.25
+        segments["age_band"] = pd.Series(
+            pd.cut(age_years, bins=AGE_BAND_EDGES, labels=AGE_BAND_LABELS).astype(str)
+        )
+
+    return segments
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -154,6 +192,19 @@ def stage_train():
     result = train(X_tr, y_tr, X_val, y_val, feats)
     logger.info("Metrics: %s", result["metrics"])
 
+    # ── Fairness / calibration-by-segment / FN-FP analysis ───────────────────
+    # Re-scored on the same validation split train() used, against the just-
+    # saved calibrated model + optimal threshold — no retraining involved.
+    calibrated = joblib.load(MODELS_DIR / "calibrated_model.pkl")
+    opt_thr    = json.loads((MODELS_DIR / "threshold.json").read_text())["threshold"]
+    y_prob_val = calibrated.predict_proba(X_val.values)[:, 1]
+
+    enc_state = joblib.load(MODELS_DIR / "enc_state.pkl") if (MODELS_DIR / "enc_state.pkl").exists() else {}
+    segments  = _build_fairness_segments(X_val, enc_state)
+
+    fairness_report = build_fairness_report(y_val.values, y_prob_val, opt_thr, segments) if segments else {}
+    error_analysis  = build_error_analysis(y_val.values, y_prob_val, opt_thr, segments)
+
     # Enrich precomputed_stats with dataset info
     stats_path = MODELS_DIR / "precomputed_stats.json"
     if stats_path.exists():
@@ -166,12 +217,18 @@ def stage_train():
             "default_count":    int(y.sum()),
             "non_default_count":int((y == 0).sum()),
         }
+        stats["fairness"]       = fairness_report
+        stats["error_analysis"] = error_analysis
+
         # Statistical report
         if (MODELS_DIR / "statistical_report.json").exists():
             stat_report = json.loads((MODELS_DIR / "statistical_report.json").read_text())
             stats["statistical_report"] = stat_report
 
         stats_path.write_text(json.dumps(stats, indent=2))
+        logger.info("Fairness segments: %s | FN=%d FP=%d",
+                    list(fairness_report.keys()),
+                    error_analysis["overall"]["fn_count"], error_analysis["overall"]["fp_count"])
 
 
 def stage_predict():
@@ -191,9 +248,29 @@ def stage_predict():
     logger.info("Submission saved: %d rows", len(sub))
 
 
+def stage_drift():
+    logger.info("=" * 60)
+    logger.info("STAGE: Drift Monitoring (PSI)")
+    logger.info("=" * 60)
+
+    ref_df = pd.read_parquet(DATA_PROCESSED / "train_features.parquet")
+    cur_df = pd.read_parquet(DATA_PROCESSED / "test_features.parquet")
+    features = [f for f in DRIFT_FEATURE_CANDIDATES if f in ref_df.columns and f in cur_df.columns]
+
+    drift_report = build_drift_report(ref_df, cur_df, features)
+    logger.info("Drift: %d checked | %d significant | %d moderate",
+                drift_report["summary"]["n_features_checked"],
+                drift_report["summary"]["n_significant"],
+                drift_report["summary"]["n_moderate"])
+
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    (MODELS_DIR / "drift_report.json").write_text(json.dumps(drift_report, indent=2))
+    logger.info("Drift report saved → models/artifacts/drift_report.json")
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", choices=["features","stats","train","predict","all"],
+    parser.add_argument("--stage", choices=["features","stats","train","predict","drift","all"],
                         default="all")
     args = parser.parse_args()
 
@@ -202,6 +279,7 @@ def main():
         "stats":    stage_stats,
         "train":    stage_train,
         "predict":  stage_predict,
+        "drift":    stage_drift,
     }
 
     if args.stage == "all":

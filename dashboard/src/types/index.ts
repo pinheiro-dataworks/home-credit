@@ -63,3 +63,53 @@ export type FilterPeriod      = "7d" | "30d" | "90d" | "1y" | "all";
 export type FilterContractType = "all" | "Cash loans" | "Revolving loans";
 export type FilterRiskLevel    = "all" | "Low" | "Medium" | "High";
 export type FilterGender       = "all" | "M" | "F";
+
+// ── Responsible AI ────────────────────────────────────────────────────────────
+
+export interface CalibrationCurve {
+  mean_predicted: number[];
+  fraction_pos: number[];
+}
+
+export interface FairnessGroup {
+  n: number;
+  base_rate: number;
+  selection_rate: number;
+  tpr: number | null;
+  fpr: number | null;
+  precision: number | null;
+  auc_roc: number | null;
+  confusion_matrix: { tn: number; fp: number; fn: number; tp: number };
+  calibration_curve: CalibrationCurve;
+}
+
+export interface FairnessSegment {
+  groups: Record<string, FairnessGroup>;
+  disparate_impact_ratio: number | null;
+  equal_opportunity_diff: number | null;
+}
+
+export type FairnessReport = Record<string, FairnessSegment>;
+
+export interface ErrorAnalysis {
+  overall: {
+    fn_count: number; fp_count: number;
+    fn_rate: number | null; fp_rate: number | null;
+    fn_avg_probability: number | null; fp_avg_probability: number | null;
+    tn_avg_probability: number | null; tp_avg_probability: number | null;
+  };
+  by_segment: Record<string, Record<string, { n: number; fn_rate: number | null; fp_rate: number | null }>>;
+}
+
+export interface DriftFeature {
+  feature: string;
+  psi: number | null;
+  status: "stable" | "moderate" | "significant" | "unknown";
+}
+
+export interface DriftReport {
+  reference_population: string;
+  current_population: string;
+  features: DriftFeature[];
+  summary: { n_features_checked: number; n_significant: number; n_moderate: number; n_stable: number };
+}

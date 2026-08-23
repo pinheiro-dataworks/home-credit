@@ -20,15 +20,17 @@ class Predictor:
         self.features    = []
         self.threshold   = 0.35
         self.stats       = {}
+        self.drift       = {}
         self._load()
 
     def _load(self):
         try:
             import joblib
-            model_path = MODELS_DIR / "calibrated_model.pkl"
-            feat_path  = MODELS_DIR / "feature_names.json"
-            thr_path   = MODELS_DIR / "threshold.json"
-            stats_path = MODELS_DIR / "precomputed_stats.json"
+            model_path  = MODELS_DIR / "calibrated_model.pkl"
+            feat_path   = MODELS_DIR / "feature_names.json"
+            thr_path    = MODELS_DIR / "threshold.json"
+            stats_path  = MODELS_DIR / "precomputed_stats.json"
+            drift_path  = MODELS_DIR / "drift_report.json"
 
             if model_path.exists():
                 self.model     = joblib.load(model_path)
@@ -41,6 +43,8 @@ class Predictor:
 
             if stats_path.exists():
                 self.stats = json.loads(stats_path.read_text())
+            if drift_path.exists():
+                self.drift = json.loads(drift_path.read_text())
         except Exception as exc:
             logger.error("Model load error: %s", exc)
 
@@ -128,6 +132,15 @@ class Predictor:
     def get_statistical_report(self) -> dict:
         return self.stats.get("statistical_report", {"ks_tests": [], "chi2_tests": []})
 
+    def get_fairness_report(self) -> dict:
+        return self.stats.get("fairness") or _MOCK_FAIRNESS
+
+    def get_error_analysis(self) -> dict:
+        return self.stats.get("error_analysis") or _MOCK_ERROR_ANALYSIS
+
+    def get_drift_report(self) -> dict:
+        return self.drift or _MOCK_DRIFT
+
     # ── Mock data (demo mode when model hasn't been trained yet) ─────────────
 
     def _mock_prediction(self, inp: dict) -> dict:
@@ -192,3 +205,101 @@ _MOCK_SHAP = [
     {"feature": "INSTAL_LATE_RATIO",   "shap_importance": 0.0143},
     {"feature": "EXT_SOURCE_MEAN",     "shap_importance": 0.0131},
 ]
+
+
+# ── Fallback fairness / error-analysis / drift (illustrative, pre-training) ──
+
+def _fairness_group(n, pos, neg, tp, fn, fp, tn, calib):
+    return {
+        "n": n,
+        "base_rate":      round(pos / n, 4),
+        "selection_rate": round((tp + fp) / n, 4),
+        "tpr":            round(tp / pos, 4),
+        "fpr":            round(fp / neg, 4),
+        "precision":      round(tp / (tp + fp), 4),
+        "auc_roc":        None,
+        "confusion_matrix": {"tn": tn, "fp": fp, "fn": fn, "tp": tp},
+        "calibration_curve": calib,
+    }
+
+_MOCK_FAIRNESS = {
+    "CODE_GENDER": {
+        "groups": {
+            "F": _fairness_group(45_200, 3_571, 41_629, 2_432, 1_139, 6_328, 35_301,
+                                  {"mean_predicted": [0.03,0.11,0.22,0.38,0.66],
+                                   "fraction_pos":   [0.02,0.10,0.21,0.37,0.64]}),
+            "M": _fairness_group(23_800, 2_118, 21_682, 1_408,   710, 3_708, 17_974,
+                                  {"mean_predicted": [0.04,0.13,0.25,0.41,0.69],
+                                   "fraction_pos":   [0.03,0.12,0.24,0.40,0.68]}),
+        },
+        "disparate_impact_ratio": 0.8934,
+        "equal_opportunity_diff": 0.0155,
+    },
+    "age_band": {
+        "groups": {
+            "18-24": _fairness_group(3_100,   409, 2_691,   291,  118,   533, 2_158,
+                                      {"mean_predicted": [0.06,0.18,0.32,0.50,0.78],
+                                       "fraction_pos":   [0.09,0.24,0.40,0.55,0.74]}),
+            "25-34": _fairness_group(18_200, 1_711, 16_489, 1_179,  532, 2_655, 13_834,
+                                      {"mean_predicted": [0.04,0.14,0.26,0.42,0.70],
+                                       "fraction_pos":   [0.04,0.13,0.25,0.41,0.69]}),
+            "35-44": _fairness_group(16_400, 1_328, 15_072,   892,  436, 2_246, 12_826,
+                                      {"mean_predicted": [0.03,0.12,0.23,0.39,0.67],
+                                       "fraction_pos":   [0.03,0.11,0.22,0.38,0.66]}),
+            "45-54": _fairness_group(13_100,   930, 12_170,   612,  318, 1_679, 10_491,
+                                      {"mean_predicted": [0.03,0.10,0.20,0.35,0.63],
+                                       "fraction_pos":   [0.02,0.09,0.19,0.34,0.62]}),
+            "55-64": _fairness_group(8_900,    552,  8_348,   354,  198, 1_010,  7_338,
+                                      {"mean_predicted": [0.02,0.09,0.18,0.32,0.60],
+                                       "fraction_pos":   [0.02,0.08,0.17,0.31,0.58]}),
+            "65+":   _fairness_group(2_100,    122,  1_978,    73,   49,   253,  1_725,
+                                      {"mean_predicted": [0.02,0.08,0.17,0.30,0.58],
+                                       "fraction_pos":   [0.04,0.13,0.24,0.38,0.62]}),
+        },
+        "disparate_impact_ratio": 0.4428,
+        "equal_opportunity_diff": 0.1136,
+    },
+}
+
+_MOCK_ERROR_ANALYSIS = {
+    "overall": {
+        "fn_count": 1_900, "fp_count": 2_400,
+        "fn_rate": 0.268, "fp_rate": 0.044,
+        "fn_avg_probability": 0.291, "fp_avg_probability": 0.432,
+        "tn_avg_probability": 0.081, "tp_avg_probability": 0.628,
+    },
+    "by_segment": {
+        "CODE_GENDER": {
+            "F": {"n": 45_200, "fn_rate": 0.319, "fp_rate": 0.152},
+            "M": {"n": 23_800, "fn_rate": 0.335, "fp_rate": 0.171},
+        },
+        "age_band": {
+            "18-24": {"n": 3_100,  "fn_rate": 0.288, "fp_rate": 0.198},
+            "25-34": {"n": 18_200, "fn_rate": 0.311, "fp_rate": 0.161},
+            "35-44": {"n": 16_400, "fn_rate": 0.328, "fp_rate": 0.149},
+            "45-54": {"n": 13_100, "fn_rate": 0.342, "fp_rate": 0.138},
+            "55-64": {"n": 8_900,  "fn_rate": 0.359, "fp_rate": 0.121},
+            "65+":   {"n": 2_100,  "fn_rate": 0.402, "fp_rate": 0.128},
+        },
+    },
+}
+
+_MOCK_DRIFT = {
+    "reference_population": "application_train (training population)",
+    "current_population": "application_test (Kaggle holdout, used as a covariate-shift proxy — no live production stream is connected yet)",
+    "features": [
+        {"feature": "DAYS_EMPLOYED",      "psi": 0.312, "status": "significant"},
+        {"feature": "AMT_INCOME_TOTAL",   "psi": 0.187, "status": "moderate"},
+        {"feature": "NAME_INCOME_TYPE",   "psi": 0.143, "status": "moderate"},
+        {"feature": "AMT_CREDIT",         "psi": 0.081, "status": "stable"},
+        {"feature": "AMT_ANNUITY",        "psi": 0.067, "status": "stable"},
+        {"feature": "EXT_SOURCE_1",       "psi": 0.054, "status": "stable"},
+        {"feature": "EXT_SOURCE_2",       "psi": 0.041, "status": "stable"},
+        {"feature": "EXT_SOURCE_3",       "psi": 0.038, "status": "stable"},
+        {"feature": "DAYS_BIRTH",         "psi": 0.029, "status": "stable"},
+        {"feature": "CODE_GENDER",        "psi": 0.012, "status": "stable"},
+        {"feature": "NAME_EDUCATION_TYPE","psi": 0.019, "status": "stable"},
+        {"feature": "AMT_GOODS_PRICE",    "psi": 0.076, "status": "stable"},
+    ],
+    "summary": {"n_features_checked": 12, "n_significant": 1, "n_moderate": 2, "n_stable": 9},
+}
