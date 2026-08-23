@@ -24,6 +24,12 @@ from imblearn.over_sampling import SMOTE, ADASYN
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import roc_auc_score
+try:
+    # scikit-learn >= 1.6 removed CalibratedClassifierCV(cv="prefit") in favour
+    # of wrapping the already-fitted estimator explicitly.
+    from sklearn.frozen import FrozenEstimator
+except ImportError:
+    FrozenEstimator = None
 from ..config import MODELS_DIR, PARAMS, RANDOM_STATE, EXPERIMENT_NAME, MLFLOW_URI
 from ..utils.stats import (
     bootstrap_metrics, model_ks_statistic, find_optimal_threshold, build_statistical_report
@@ -172,7 +178,10 @@ def train(
 
         # ── 4. Probability calibration ────────────────────────────────────────
         calib_method = PARAMS["calibration"]["method"]
-        calibrated   = CalibratedClassifierCV(model, method=calib_method, cv="prefit")
+        if FrozenEstimator is not None:
+            calibrated = CalibratedClassifierCV(FrozenEstimator(model), method=calib_method)
+        else:
+            calibrated = CalibratedClassifierCV(model, method=calib_method, cv="prefit")
         calibrated.fit(X_val.values, y_val.values)
 
         # ── 5. Threshold optimisation ─────────────────────────────────────────
