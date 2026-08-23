@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import {
-  LayoutDashboard, TrendingUp, Zap, BarChart2,
+  LayoutDashboard, TrendingUp, Zap, BarChart2, ShieldCheck,
   Search, ChevronRight, ArrowUpRight,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -13,6 +13,7 @@ const NAV = [
   { href: "/performance",   label: "Model Performance",icon: TrendingUp       },
   { href: "/predict",       label: "Risk Score",       icon: Zap              },
   { href: "/statistics",    label: "Statistics",       icon: BarChart2        },
+  { href: "/responsible-ai",label: "Responsible AI",   icon: ShieldCheck      },
 ];
 
 export default function Sidebar() {

@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
+import { ShieldCheck, ArrowUpRight } from "lucide-react";
 import Sidebar   from "@/components/layout/Sidebar";
 import TopBar    from "@/components/layout/TopBar";
 import PredictionForm from "@/components/prediction/PredictionForm";
@@ -81,27 +83,20 @@ export default function PredictPage() {
             <FeatureImportanceChart data={TOP_FEATURES} top={10} />
           </div>
 
-          {/* Model card */}
-          <div className="card">
-            <h2 className="text-sm font-semibold text-ink mb-3">Model Card</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              {[
-                { label: "Algorithm",      value: "LightGBM (GBDT)" },
-                { label: "Resampling",     value: "SMOTE (0.3 ratio)" },
-                { label: "Tuning",         value: "Optuna · 50 trials" },
-                { label: "Calibration",    value: "Isotonic regression" },
-                { label: "Threshold",      value: "Optimised (F1)" },
-                { label: "Explainability", value: "SHAP TreeExplainer" },
-                { label: "Tracking",       value: "MLflow experiments" },
-                { label: "Versioning",     value: "DVC pipeline" },
-              ].map(({ label, value }) => (
-                <div key={label} className="bg-surface-muted rounded-xl p-3">
-                  <p className="text-[10px] text-ink-muted uppercase tracking-wide font-medium">{label}</p>
-                  <p className="font-semibold text-ink mt-1">{value}</p>
-                </div>
-              ))}
+          {/* Responsible AI pointer */}
+          <Link href="/responsible-ai" className="card flex items-center gap-4 p-4 hover:border-brand-300 transition-colors">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 text-brand-600" />
             </div>
-          </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-ink">Full model card &amp; responsible AI evaluation</p>
+              <p className="text-[11px] text-ink-muted mt-0.5">
+                Intended use, limitations, sensitive features &amp; proxies, subgroup fairness,
+                calibration by segment, false negative/positive analysis, and drift monitoring.
+              </p>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-light shrink-0" />
+          </Link>
         </main>
       </div>
     </div>

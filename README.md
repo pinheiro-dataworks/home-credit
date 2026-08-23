@@ -161,7 +161,9 @@ Home_Credit/
 │   ├── features/engineering.py     # 200+ feature construction
 │   ├── models/
 │   │   ├── train.py                # Optuna + SMOTE + SHAP + MLflow
-│   │   └── evaluate.py             # Metrics, curves, calibration
+│   │   ├── evaluate.py             # Metrics, curves, calibration
+│   │   ├── fairness.py             # Subgroup fairness & error analysis
+│   │   └── drift.py                # Population Stability Index (PSI)
 │   └── utils/stats.py              # KS, Chi-Square, Bootstrap CI
 ├── api/
 │   ├── main.py                     # FastAPI application
@@ -169,10 +171,10 @@ Home_Credit/
 │   └── predictor.py                # Model loading & inference
 ├── dashboard/                      # Next.js 14 + TypeScript
 │   └── src/
-│       ├── app/                    # 4 pages: overview, performance, predict, statistics
+│       ├── app/                    # 5 pages: overview, performance, predict, statistics, responsible-ai
 │       └── components/             # Sidebar, TopBar, Charts, Table, PredictionForm
 ├── models/artifacts/               # Trained model + precomputed stats
-├── pipeline.py                     # DVC-compatible 4-stage orchestrator
+├── pipeline.py                     # DVC-compatible 5-stage orchestrator
 ├── dvc.yaml                        # Reproducible pipeline definition
 ├── params.yaml                     # All hyperparameters & config
 ├── Dockerfile                      # API container for Render
@@ -214,8 +216,9 @@ dvc repro
 # Or manually stage by stage
 python pipeline.py --stage features   # Build 200+ features
 python pipeline.py --stage stats      # KS + Chi-Square analysis
-python pipeline.py --stage train      # Train + tune + calibrate + log to MLflow
+python pipeline.py --stage train      # Train + tune + calibrate + fairness/error analysis + log to MLflow
 python pipeline.py --stage predict    # Generate submission file
+python pipeline.py --stage drift      # Population Stability Index vs. the Kaggle test split
 ```
 
 ### 3. Start the API locally
@@ -278,6 +281,7 @@ Tracked per run: all Optuna hyperparameters, AUC-ROC, F1, KS statistic, optimal 
 | **Model Performance** | ROC curve, Precision-Recall curve, probability calibration, confusion matrix, Bootstrap CI table |
 | **Risk Score & Decision Support** | Real-time application scoring form with animated gauge, risk band, and recommended action for manual review |
 | **Statistics** | KS test results, Chi-Square test results, target and feature distribution charts |
+| **Responsible AI** | Model card, intended use & limitations, sensitive-variable/proxy disclosure, subgroup fairness (disparate impact, equal opportunity), calibration by segment, false negative/positive analysis, and drift monitoring (PSI) |
 
 ---
 
