@@ -89,6 +89,11 @@ export default function PredictionForm() {
     : result.risk_label === "Medium" ? "amber"
     : "red";
 
+  const recommendedAction = !result ? ""
+    : result.risk_label === "Low"    ? "Proceed — standard processing"
+    : result.risk_label === "Medium" ? "Manual review"
+    : "Escalate — senior underwriter review";
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
       {/* Form */}
@@ -179,7 +184,7 @@ export default function PredictionForm() {
                 )}>
                   {result.risk_score.toFixed(1)}%
                 </span>
-                <span className="text-xs text-ink-muted">risk score</span>
+                <span className="text-xs text-ink-muted">risk probability</span>
               </div>
             </div>
 
@@ -190,27 +195,31 @@ export default function PredictionForm() {
                 color === "amber" && "bg-amber-100 text-amber-700",
                 color === "red"   && "bg-red-100   text-red-700",
               )}>
-                {result.predicted_default
-                  ? <AlertTriangle className="w-4 h-4" />
-                  : <CheckCircle className="w-4 h-4" />}
-                {result.risk_label} Risk
+                {color === "green"
+                  ? <CheckCircle className="w-4 h-4" />
+                  : <AlertTriangle className="w-4 h-4" />}
+                Risk band: {result.risk_label}
               </div>
               <p className="text-xs text-ink-muted">
-                Default probability:{" "}
+                Risk probability:{" "}
                 <span className="font-semibold text-ink">
                   {(result.default_probability * 100).toFixed(2)}%
                 </span>
               </p>
               <p className="text-xs text-ink-muted mt-1">
-                Threshold: <span className="font-medium">{(result.threshold * 100).toFixed(1)}%</span>
-                {" · "}
-                Decision:{" "}
+                Recommended action:{" "}
                 <span className={clsx(
                   "font-semibold",
-                  result.predicted_default ? "text-red-600" : "text-green-600"
+                  color === "green" && "text-green-600",
+                  color === "amber" && "text-amber-600",
+                  color === "red"   && "text-red-600",
                 )}>
-                  {result.predicted_default ? "Deny" : "Approve"}
+                  {recommendedAction}
                 </span>
+              </p>
+              <p className="text-[10px] text-ink-light mt-2">
+                Model flag threshold: {(result.threshold * 100).toFixed(1)}% — a decision-support
+                signal, not an automated approve/deny outcome.
               </p>
             </div>
 

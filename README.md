@@ -22,7 +22,7 @@
 
 This project addresses one of the most critical challenges in consumer lending: **predicting credit default risk for applicants who have little or no formal credit history**. Leveraging the [Home Credit Default Risk](https://www.kaggle.com/c/home-credit-default-risk) dataset — an internationally recognized benchmark in financial machine learning — this case study demonstrates a complete, production-grade MLOps pipeline from raw data ingestion to live API deployment and an interactive dashboard.
 
-The work covers the full data science lifecycle: rigorous statistical feature analysis across eight relational tables, advanced feature engineering, imbalanced-class treatment, gradient boosting with automated hyperparameter optimization, model explainability, probability calibration, and zero-cost cloud deployment — delivering an enterprise-ready solution without any paid platform subscriptions.
+The work covers the full data science lifecycle: rigorous statistical feature analysis across eight relational tables, advanced feature engineering, imbalanced-class treatment, gradient boosting with automated hyperparameter optimization, model explainability, probability calibration, and zero-cost cloud deployment — delivering a production-oriented MLOps case study without any paid platform subscriptions.
 
 ---
 
@@ -276,7 +276,7 @@ Tracked per run: all Optuna hyperparameters, AUC-ROC, F1, KS statistic, optimal 
 |---|---|
 | **Overview** | KPI cards (AUC, default rate, KS), risk score distribution, SHAP importance chart, live applications table |
 | **Model Performance** | ROC curve, Precision-Recall curve, probability calibration, confusion matrix, Bootstrap CI table |
-| **Live Prediction** | Real-time application scoring form with animated gauge and Approve/Deny decision |
+| **Risk Score & Decision Support** | Real-time application scoring form with animated gauge, risk band, and recommended action for manual review |
 | **Statistics** | KS test results, Chi-Square test results, target and feature distribution charts |
 
 ---

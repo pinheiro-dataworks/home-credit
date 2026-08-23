@@ -34,11 +34,11 @@ export default function PredictPage() {
       <Sidebar />
       <div className="ml-60 flex-1 flex flex-col min-w-0">
         <TopBar filters={filters} onChange={(f) => setFilters((p) => ({ ...p, ...f }))}
-                title="Live Prediction" breadcrumb={["Dashboard","Live Prediction"]} />
+                title="Risk Score & Decision Support" breadcrumb={["Dashboard","Risk Score"]} />
 
         <main className="mt-16 p-6 flex flex-col gap-6">
           <div>
-            <h1 className="text-xl font-semibold text-ink">Live Risk Prediction</h1>
+            <h1 className="text-xl font-semibold text-ink">Risk Score & Decision Support</h1>
             <p className="text-xs text-ink-muted mt-0.5">
               Calibrated LightGBM · 200+ engineered features · Real-time scoring
             </p>
@@ -66,7 +66,8 @@ export default function PredictPage() {
           <div className="card">
             <h2 className="text-sm font-semibold text-ink mb-1">Application Scoring</h2>
             <p className="text-[11px] text-ink-muted mb-5">
-              Submit an application to receive a real-time default probability from the deployed model.
+              Submit an application to receive a calibrated default-risk probability and a recommended
+              next action for human review — this is a decision-support signal, not an automated decision.
             </p>
             <PredictionForm />
           </div>

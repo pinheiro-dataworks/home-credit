@@ -11,7 +11,7 @@ import { clsx } from "clsx";
 const NAV = [
   { href: "/",              label: "Overview",         icon: LayoutDashboard },
   { href: "/performance",   label: "Model Performance",icon: TrendingUp       },
-  { href: "/predict",       label: "Live Prediction",  icon: Zap              },
+  { href: "/predict",       label: "Risk Score",       icon: Zap              },
   { href: "/statistics",    label: "Statistics",       icon: BarChart2        },
 ];
 
