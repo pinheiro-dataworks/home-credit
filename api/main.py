@@ -3,16 +3,21 @@ Home Credit Default Risk — FastAPI serving layer.
 Deployed on Render free tier via Docker.
 """
 from __future__ import annotations
+
 import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .schemas import (
-    ApplicationInput, PredictionResponse,
-    OverviewResponse, MetricsResponse, HealthResponse,
-)
 from .predictor import Predictor
+from .schemas import (
+    ApplicationInput,
+    HealthResponse,
+    MetricsResponse,
+    OverviewResponse,
+    PredictionResponse,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -148,7 +153,7 @@ async def predict(application: ApplicationInput):
 
 @app.get("/api/applications/sample", tags=["Data"])
 async def sample_applications(n: int = 10):
-    import random, math
+    import random
     random.seed(42)
     apps = []
     for i in range(n):
