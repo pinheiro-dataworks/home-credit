@@ -18,7 +18,9 @@ stages:
       - feature_engineering
     outs:
       - data/processed/train_features.parquet
+      - data/processed/calibration_features.parquet
       - data/processed/test_features.parquet
+      - data/processed/submission_features.parquet
       - data/features/feature_names.json
 
   statistical_analysis:
@@ -36,6 +38,8 @@ stages:
     cmd: python pipeline.py --stage train
     deps:
       - data/processed/train_features.parquet
+      - data/processed/calibration_features.parquet
+      - data/processed/test_features.parquet
       - src/models/train.py
       - src/models/evaluate.py
       - src/models/fairness.py
@@ -61,7 +65,7 @@ stages:
   predict:
     cmd: python pipeline.py --stage predict
     deps:
-      - data/processed/test_features.parquet
+      - data/processed/submission_features.parquet
       - models/artifacts/calibrated_model.pkl
       - models/artifacts/threshold.json
     outs:
@@ -71,7 +75,7 @@ stages:
     cmd: python pipeline.py --stage drift
     deps:
       - data/processed/train_features.parquet
-      - data/processed/test_features.parquet
+      - data/processed/submission_features.parquet
       - src/models/drift.py
     outs:
       - models/artifacts/drift_report.json
