@@ -11,10 +11,11 @@ Metrics follow standard fairness-in-ML definitions:
   - fpr                    : false-positive-rate parity
 """
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
-from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.calibration import calibration_curve
+from sklearn.metrics import confusion_matrix, roc_auc_score
 
 MIN_GROUP_SIZE = 30
 

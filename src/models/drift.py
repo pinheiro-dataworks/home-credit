@@ -13,6 +13,7 @@ Standard PSI thresholds (credit-risk industry convention):
   >= 0.25 significant  — distribution has shifted meaningfully, consider retraining
 """
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 

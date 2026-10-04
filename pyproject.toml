@@ -1,0 +1,23 @@
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = ["notebooks", "mlruns", "dashboard"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # long lines are common in this codebase's aligned-table style; not worth breaking readability over
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "api"]
+
+[tool.ruff.lint.per-file-ignores]
+# pipeline.py inserts its own directory onto sys.path before importing `src`,
+# so those imports can't be moved above that line.
+"pipeline.py" = ["E402"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--cov=src --cov=api --cov-report=term-missing"

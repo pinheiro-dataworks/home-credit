@@ -1,12 +1,18 @@
 """Model evaluation utilities — builds a comprehensive report dict for the dashboard."""
 from __future__ import annotations
+
 import numpy as np
-from sklearn.metrics import (
-    roc_auc_score, average_precision_score,
-    precision_score, recall_score, f1_score,
-    confusion_matrix, roc_curve, precision_recall_curve,
-)
 from sklearn.calibration import calibration_curve
+from sklearn.metrics import (
+    average_precision_score,
+    confusion_matrix,
+    f1_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
+)
 
 
 def build_eval_report(
