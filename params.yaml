@@ -4,7 +4,14 @@ data:
   features_dir: data/features
   target_col: TARGET
   id_col: SK_ID_CURR
-  test_size: 0.2
+  # Three-way, label-stratified split performed once in the features stage,
+  # before any fitting step (imputation, encoding, feature selection):
+  #   train       -> Optuna CV search and the final LightGBM fit
+  #   calibration -> early stopping, isotonic calibration, threshold selection
+  #   test        -> untouched until the final report (metrics, bootstrap CI,
+  #                  fairness, error analysis)
+  calibration_size: 0.15
+  test_size: 0.15
   random_state: 42
 
 feature_engineering:
@@ -16,7 +23,12 @@ feature_engineering:
   nan_threshold: 0.6            # drop columns with > 60% NaN
 
 sampling:
-  method: smote                 # smote | adasyn | none
+  # Default is "none": class imbalance is handled via class_weight="balanced"
+  # on LightGBM instead of synthetic oversampling. See reports/sampling_comparison.md
+  # for the CV comparison against SMOTE that motivated this choice. "smote" and
+  # "adasyn" remain available and are applied inside an imblearn Pipeline so
+  # resampling only ever touches the training fold, never validation/calibration data.
+  method: none                  # none | smote | adasyn
   sampling_strategy: 0.3
   k_neighbors: 5
 
@@ -41,7 +53,15 @@ lightgbm_defaults:
 
 threshold:
   optimize: true
-  metric: f1                    # f1 | precision | recall | ks
+  # Default is "f1": it needs no business assumptions. "cost" is available for
+  # when real unit economics are known — it minimises cost_fn * FN + cost_fp * FP.
+  # The 5:1 weights below are an illustrative placeholder (a commonly cited rule
+  # of thumb for consumer credit default, not a figure validated for this
+  # portfolio) and must be replaced with real figures before being used to
+  # drive an actual lending decision.
+  metric: f1                    # f1 | precision | recall | ks | cost
+  cost_fn: 5.0                  # relative cost of a missed default (false negative)
+  cost_fp: 1.0                  # relative cost of declining a good applicant (false positive)
 
 calibration:
   method: isotonic             # isotonic | sigmoid

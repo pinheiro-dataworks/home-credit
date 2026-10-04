@@ -5,17 +5,18 @@ Usage:
     python pipeline.py --stage stats
     python pipeline.py --stage train
     python pipeline.py --stage predict
+    python pipeline.py --stage drift
     python pipeline.py --stage all
 """
 from __future__ import annotations
+
 import argparse
 import json
 import logging
 import sys
 from pathlib import Path
-import numpy as np
+
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,18 +28,26 @@ logger = logging.getLogger("pipeline")
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
+import joblib
+
 from src.config import (
-    DATA_PROCESSED, DATA_FEATURES, MODELS_DIR,
-    TARGET_COL, ID_COL, RANDOM_STATE, TEST_SIZE, NAN_THRESHOLD, PARAMS,
+    CALIBRATION_SIZE,
+    DATA_FEATURES,
+    DATA_PROCESSED,
+    ID_COL,
+    MODELS_DIR,
+    NAN_THRESHOLD,
+    RANDOM_STATE,
+    TARGET_COL,
+    TEST_SIZE,
 )
 from src.data.loader import load_all
+from src.data.splitting import three_way_split
 from src.features.engineering import build_features, encode_and_impute
-from src.utils.stats import build_statistical_report
-from src.models.train import train
-from src.models.evaluate import build_eval_report
-from src.models.fairness import build_fairness_report, build_error_analysis
 from src.models.drift import build_drift_report
-import joblib
+from src.models.fairness import build_error_analysis, build_fairness_report
+from src.models.train import train
+from src.utils.stats import build_statistical_report
 
 # Raw demographic/categorical columns used to slice fairness & error-analysis
 # segments. DAYS_BIRTH is binned into age_band below rather than used raw.
@@ -52,6 +61,8 @@ DRIFT_FEATURE_CANDIDATES = [
     "AMT_INCOME_TOTAL", "AMT_CREDIT", "AMT_ANNUITY", "AMT_GOODS_PRICE",
     "CODE_GENDER", "NAME_EDUCATION_TYPE", "NAME_INCOME_TYPE",
 ]
+
+SPLIT_NAMES = ("train", "calibration", "test")
 
 
 def _build_fairness_segments(df_raw_slice: pd.DataFrame, enc_state: dict) -> dict:
@@ -80,6 +91,9 @@ def _build_fairness_segments(df_raw_slice: pd.DataFrame, enc_state: dict) -> dic
 # ──────────────────────────────────────────────────────────────────────────────
 
 def stage_features():
+    """Engineer features once, then split BEFORE any fitting step (imputation
+    medians, categorical encoders) so that the calibration and test partitions
+    never influence a transform applied to the training partition."""
     logger.info("=" * 60)
     logger.info("STAGE: Feature Engineering")
     logger.info("=" * 60)
@@ -87,8 +101,9 @@ def stage_features():
     raw = load_all()
     DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
     DATA_FEATURES.mkdir(parents=True, exist_ok=True)
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-    train_df = build_features(
+    full_df = build_features(
         app       = raw["train"],
         bureau    = raw["bureau"],
         bureau_bal= raw["bureau_bal"],
@@ -98,8 +113,7 @@ def stage_features():
         inst      = raw["installments"],
         nan_threshold=NAN_THRESHOLD,
     )
-
-    test_df = build_features(
+    submission_df = build_features(
         app       = raw["test"],
         bureau    = raw["bureau"],
         bureau_bal= raw["bureau_bal"],
@@ -110,45 +124,62 @@ def stage_features():
         nan_threshold=NAN_THRESHOLD,
     )
 
-    # Align test columns to train (minus TARGET)
-    feature_cols = [c for c in train_df.columns if c not in [TARGET_COL, ID_COL]]
-    test_df = test_df.reindex(columns=[ID_COL] + feature_cols)
+    feature_cols = [c for c in full_df.columns if c not in [TARGET_COL, ID_COL]]
+    submission_df = submission_df.reindex(columns=[ID_COL] + feature_cols)
 
-    # Encode and impute
-    X_train, enc_state = encode_and_impute(train_df[feature_cols], fit=True)
-    X_test,  _         = encode_and_impute(test_df[feature_cols],  fit=False, _state=enc_state)
+    # ── Three-way, label-stratified split (unencoded, unimputed) ───────────────
+    split_idx = three_way_split(
+        full_df.index, full_df[TARGET_COL],
+        calibration_size=CALIBRATION_SIZE, test_size=TEST_SIZE, random_state=RANDOM_STATE,
+    )
+    train_idx = split_idx["train"]
 
-    train_out = pd.concat([
-        train_df[[ID_COL, TARGET_COL]].reset_index(drop=True),
-        X_train.reset_index(drop=True),
+    # ── Fit imputation/encoding on the training partition only ─────────────────
+    X_train_raw, enc_state = encode_and_impute(full_df.loc[train_idx, feature_cols], fit=True)
+    split_encoded = {"train": X_train_raw}
+    for name in ("calibration", "test"):
+        X_t, _ = encode_and_impute(full_df.loc[split_idx[name], feature_cols], fit=False, _state=enc_state)
+        split_encoded[name] = X_t
+
+    X_submission, _ = encode_and_impute(submission_df[feature_cols], fit=False, _state=enc_state)
+
+    split_shapes = {}
+    for name in SPLIT_NAMES:
+        idx = split_idx[name]
+        part = pd.concat([
+            full_df.loc[idx, [ID_COL, TARGET_COL]].reset_index(drop=True),
+            split_encoded[name].reset_index(drop=True),
+        ], axis=1)
+        part.to_parquet(DATA_PROCESSED / f"{name}_features.parquet", index=False)
+        split_shapes[name] = {
+            "shape": list(part.shape),
+            "default_rate": round(float(part[TARGET_COL].mean()), 4),
+        }
+        logger.info("%-11s → %s (default rate %.4f)", name, part.shape, split_shapes[name]["default_rate"])
+
+    submission_out = pd.concat([
+        submission_df[[ID_COL]].reset_index(drop=True),
+        X_submission.reset_index(drop=True),
     ], axis=1)
-    test_out  = pd.concat([
-        test_df[[ID_COL]].reset_index(drop=True),
-        X_test.reset_index(drop=True),
-    ], axis=1)
-
-    train_out.to_parquet(DATA_PROCESSED / "train_features.parquet", index=False)
-    test_out.to_parquet (DATA_PROCESSED / "test_features.parquet",  index=False)
+    submission_out.to_parquet(DATA_PROCESSED / "submission_features.parquet", index=False)
     joblib.dump(enc_state, MODELS_DIR / "enc_state.pkl")
 
     feat_meta = {
         "features": feature_cols,
         "n_features": len(feature_cols),
-        "train_shape": list(train_out.shape),
-        "test_shape":  list(test_out.shape),
-        "target_distribution": {
-            "0": round(float((train_df[TARGET_COL] == 0).mean()), 4),
-            "1": round(float((train_df[TARGET_COL] == 1).mean()), 4),
-        },
+        "splits": split_shapes,
+        "submission_shape": list(submission_out.shape),
     }
     (DATA_FEATURES / "feature_names.json").write_text(json.dumps(feat_meta, indent=2))
     (MODELS_DIR / "feature_names.json").write_text(json.dumps(feature_cols))
 
     logger.info("Features saved → %s", DATA_PROCESSED)
-    logger.info("Train: %s | Test: %s", train_out.shape, test_out.shape)
 
 
 def stage_stats():
+    """KS / Chi-square feature-selection report, computed on the training
+    partition only so that feature-selection decisions never see calibration
+    or test data."""
     logger.info("=" * 60)
     logger.info("STAGE: Statistical Analysis")
     logger.info("=" * 60)
@@ -156,7 +187,6 @@ def stage_stats():
     df = pd.read_parquet(DATA_PROCESSED / "train_features.parquet")
     report = build_statistical_report(df, target=TARGET_COL)
 
-    # Append dataset summary
     report["dataset_summary"] = {
         "n_train": int(len(df)),
         "n_features": int(df.shape[1] - 2),   # minus ID and TARGET
@@ -175,55 +205,66 @@ def stage_train():
     logger.info("STAGE: Model Training")
     logger.info("=" * 60)
 
-    df    = pd.read_parquet(DATA_PROCESSED / "train_features.parquet")
     feats = json.loads((MODELS_DIR / "feature_names.json").read_text())
 
-    # Use only columns present in df
-    feats = [f for f in feats if f in df.columns]
-    X     = df[feats]
-    y     = df[TARGET_COL]
+    splits = {}
+    for name in SPLIT_NAMES:
+        df = pd.read_parquet(DATA_PROCESSED / f"{name}_features.parquet")
+        cols = [f for f in feats if f in df.columns]
+        splits[name] = (df[cols], df[TARGET_COL])
+    feats = [f for f in feats if f in splits["train"][0].columns]
 
-    X_tr, X_val, y_tr, y_val = train_test_split(
-        X, y, test_size=TEST_SIZE, stratify=y, random_state=RANDOM_STATE
+    X_train, y_train = splits["train"]
+    X_calib, y_calib = splits["calibration"]
+    X_test,  y_test  = splits["test"]
+    logger.info(
+        "Train: %s | Calibration: %s | Test: %s | Positive rate (train): %.2f%%",
+        X_train.shape, X_calib.shape, X_test.shape, y_train.mean() * 100,
     )
-    logger.info("Train: %s | Val: %s | Positive rate train: %.2f%%",
-                X_tr.shape, X_val.shape, y_tr.mean() * 100)
 
-    result = train(X_tr, y_tr, X_val, y_val, feats)
-    logger.info("Metrics: %s", result["metrics"])
+    result = train(X_train, y_train, X_calib, y_calib, X_test, y_test, feats)
+    logger.info("Metrics (test partition): %s", result["metrics"])
 
     # ── Fairness / calibration-by-segment / FN-FP analysis ───────────────────
-    # Re-scored on the same validation split train() used, against the just-
-    # saved calibrated model + optimal threshold — no retraining involved.
-    calibrated = joblib.load(MODELS_DIR / "calibrated_model.pkl")
-    opt_thr    = json.loads((MODELS_DIR / "threshold.json").read_text())["threshold"]
-    y_prob_val = calibrated.predict_proba(X_val.values)[:, 1]
+    # Computed on the test partition — the same one the headline metrics come
+    # from — never on data used for fitting, early stopping or calibration.
+    opt_thr = json.loads((MODELS_DIR / "threshold.json").read_text())["threshold"]
+    y_prob_test = result["y_prob_test"]
 
     enc_state = joblib.load(MODELS_DIR / "enc_state.pkl") if (MODELS_DIR / "enc_state.pkl").exists() else {}
-    segments  = _build_fairness_segments(X_val, enc_state)
+    segments  = _build_fairness_segments(X_test, enc_state)
 
-    fairness_report = build_fairness_report(y_val.values, y_prob_val, opt_thr, segments) if segments else {}
-    error_analysis  = build_error_analysis(y_val.values, y_prob_val, opt_thr, segments)
+    fairness_report = build_fairness_report(y_test.values, y_prob_test, opt_thr, segments) if segments else {}
+    error_analysis  = build_error_analysis(y_test.values, y_prob_test, opt_thr, segments)
 
-    # Enrich precomputed_stats with dataset info
     stats_path = MODELS_DIR / "precomputed_stats.json"
     if stats_path.exists():
         stats = json.loads(stats_path.read_text())
+        n_total = len(X_train) + len(X_calib) + len(X_test)
+        total_defaults = int(y_train.sum() + y_calib.sum() + y_test.sum())
         stats["dataset"] = {
-            "n_train":          int(len(df)),
-            "n_val":            int(len(X_val)),
-            "n_features":       len(feats),
-            "default_rate":     round(float(y.mean()), 4),
-            "default_count":    int(y.sum()),
-            "non_default_count":int((y == 0).sum()),
+            # Whole labeled population (train + calibration + test combined) —
+            # the dashboard Overview page's portfolio-level KPIs. Since the
+            # split is label-stratified, each partition's own default rate is
+            # within noise of this value; this is the honest "how much data
+            # did we have" figure rather than any one partition's slice of it.
+            "n_train":           int(n_total),
+            "n_features":        len(feats),
+            "default_rate":      round(total_defaults / n_total, 4),
+            "default_count":     total_defaults,
+            "non_default_count": int(n_total - total_defaults),
+            # Per-partition breakdown, for anything that specifically needs it.
+            "splits": {
+                "train":       int(len(X_train)),
+                "calibration": int(len(X_calib)),
+                "test":        int(len(X_test)),
+            },
         }
         stats["fairness"]       = fairness_report
         stats["error_analysis"] = error_analysis
 
-        # Statistical report
         if (MODELS_DIR / "statistical_report.json").exists():
-            stat_report = json.loads((MODELS_DIR / "statistical_report.json").read_text())
-            stats["statistical_report"] = stat_report
+            stats["statistical_report"] = json.loads((MODELS_DIR / "statistical_report.json").read_text())
 
         stats_path.write_text(json.dumps(stats, indent=2))
         logger.info("Fairness segments: %s | FN=%d FP=%d",
@@ -232,29 +273,32 @@ def stage_train():
 
 
 def stage_predict():
+    """Score the Kaggle application_test holdout and write a submission file."""
     logger.info("=" * 60)
     logger.info("STAGE: Generate Submission")
     logger.info("=" * 60)
 
-    test_df = pd.read_parquet(DATA_PROCESSED / "test_features.parquet")
-    feats   = json.loads((MODELS_DIR / "feature_names.json").read_text())
-    model   = joblib.load(MODELS_DIR / "calibrated_model.pkl")
-    feats   = [f for f in feats if f in test_df.columns]
+    sub_df = pd.read_parquet(DATA_PROCESSED / "submission_features.parquet")
+    feats  = json.loads((MODELS_DIR / "feature_names.json").read_text())
+    model  = joblib.load(MODELS_DIR / "calibrated_model.pkl")
+    feats  = [f for f in feats if f in sub_df.columns]
 
-    probs   = model.predict_proba(test_df[feats].values)[:, 1]
-    sub     = pd.DataFrame({"SK_ID_CURR": test_df[ID_COL], "TARGET": probs})
+    probs = model.predict_proba(sub_df[feats].values)[:, 1]
+    sub   = pd.DataFrame({"SK_ID_CURR": sub_df[ID_COL], "TARGET": probs})
     (DATA_PROCESSED / "submission.csv").parent.mkdir(parents=True, exist_ok=True)
     sub.to_csv(DATA_PROCESSED / "submission.csv", index=False)
     logger.info("Submission saved: %d rows", len(sub))
 
 
 def stage_drift():
+    """Population Stability Index: training partition vs. the Kaggle
+    application_test holdout, used as a covariate-shift proxy."""
     logger.info("=" * 60)
     logger.info("STAGE: Drift Monitoring (PSI)")
     logger.info("=" * 60)
 
     ref_df = pd.read_parquet(DATA_PROCESSED / "train_features.parquet")
-    cur_df = pd.read_parquet(DATA_PROCESSED / "test_features.parquet")
+    cur_df = pd.read_parquet(DATA_PROCESSED / "submission_features.parquet")
     features = [f for f in DRIFT_FEATURE_CANDIDATES if f in ref_df.columns and f in cur_df.columns]
 
     drift_report = build_drift_report(ref_df, cur_df, features)
