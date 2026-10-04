@@ -3,10 +3,11 @@ Model loading and inference wrapper.
 Falls back to mock data when model artefacts are absent (cold demo mode).
 """
 from __future__ import annotations
+
 import json
 import logging
-import math
 from pathlib import Path
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class Predictor:
         self.threshold   = 0.35
         self.stats       = {}
         self.drift       = {}
+        self.enc_state   = {}
         self._load()
 
     def _load(self):
@@ -31,11 +33,13 @@ class Predictor:
             thr_path    = MODELS_DIR / "threshold.json"
             stats_path  = MODELS_DIR / "precomputed_stats.json"
             drift_path  = MODELS_DIR / "drift_report.json"
+            enc_path    = MODELS_DIR / "enc_state.pkl"
 
             if model_path.exists():
                 self.model     = joblib.load(model_path)
                 self.features  = json.loads(feat_path.read_text()) if feat_path.exists() else []
                 self.threshold = json.loads(thr_path.read_text())["threshold"] if thr_path.exists() else 0.35
+                self.enc_state = joblib.load(enc_path) if enc_path.exists() else {}
                 logger.info("Model loaded. Features: %d | Threshold: %.4f",
                             len(self.features), self.threshold)
             else:
@@ -58,17 +62,33 @@ class Predictor:
 
         import pandas as pd
         row = pd.DataFrame([input_dict])
+        # Optional fields the caller omits arrive as Python None rather than
+        # float NaN; engineer_application's arithmetic (e.g. unary minus on
+        # DAYS_REGISTRATION) raises on None, so normalise first.
+        row = row.where(row.notna(), np.nan)
 
-        # Engineer the same features as training
-        from src.features.engineering import engineer_application
+        # Engineer the same application-level features as training.
+        from src.features.engineering import encode_and_impute, engineer_application
         row = engineer_application(row)
 
-        # Align to training feature set
-        missing = [f for f in self.features if f not in row.columns]
-        for m in missing:
-            row[m] = np.nan
+        # Aggregated bureau/previous-application/POS/credit-card/installment
+        # features require the applicant's full transaction history, which a
+        # single live request does not carry — those columns are left absent
+        # here and filled below with the training-set median, exactly like
+        # any other missing numeric value.
+        for col in self.features:
+            if col not in row.columns:
+                row[col] = np.nan
         row = row[self.features]
-        row = row.fillna(row.median())
+
+        # Encode categoricals and impute with the *training-fitted* state —
+        # the same transform used for calibration/test during training, never
+        # refit on this request — so the live path matches what the model
+        # actually learned.
+        if self.enc_state:
+            row, _ = encode_and_impute(row, fit=False, _state=self.enc_state)
+        else:
+            row = row.fillna(row.median(numeric_only=True))
 
         prob  = float(self.model.predict_proba(row.values)[0, 1])
         label = "Low" if prob < 0.25 else ("Medium" if prob < 0.55 else "High")
