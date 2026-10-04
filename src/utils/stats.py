@@ -6,13 +6,19 @@ Statistical analysis module.
 - KS statistic for model discrimination (population stability)
 """
 from __future__ import annotations
+
 import logging
+
 import numpy as np
 import pandas as pd
 from scipy import stats as scipy_stats
 from sklearn.metrics import (
-    roc_auc_score, average_precision_score,
-    precision_score, recall_score, f1_score,
+    average_precision_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
 
 logger = logging.getLogger(__name__)
@@ -190,31 +196,42 @@ def find_optimal_threshold(
     y_prob: np.ndarray,
     metric: str = "f1",
     n_thresholds: int = 200,
+    cost_fn: float = 5.0,
+    cost_fp: float = 1.0,
 ) -> tuple[float, float]:
     """
     Grid-search over [0.01, 0.99] for the threshold maximising `metric`.
     Returns (optimal_threshold, best_metric_value).
+
+    `metric="cost"` minimises `cost_fn * false_negatives + cost_fp * false_positives`
+    instead of maximising a classification score; `cost_fn`/`cost_fp` should reflect
+    real unit economics when available (see params.yaml for the current defaults
+    and the caveat about where they come from).
     """
     thresholds = np.linspace(0.01, 0.99, n_thresholds)
-    best_val, best_thr = -1.0, 0.5
+    best_search_val, best_thr = -np.inf, 0.5
 
     for thr in thresholds:
         y_pred = (y_prob >= thr).astype(int)
         if metric == "f1":
-            val = f1_score(y_true, y_pred, zero_division=0)
+            search_val = f1_score(y_true, y_pred, zero_division=0)
         elif metric == "precision":
-            val = precision_score(y_true, y_pred, zero_division=0)
+            search_val = precision_score(y_true, y_pred, zero_division=0)
         elif metric == "recall":
-            val = recall_score(y_true, y_pred, zero_division=0)
+            search_val = recall_score(y_true, y_pred, zero_division=0)
         elif metric == "ks":
-            val = model_ks_statistic(y_true, y_prob)
+            search_val = model_ks_statistic(y_true, y_prob)
+        elif metric == "cost":
+            _, fp, fn, _ = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+            search_val = -(cost_fn * fn + cost_fp * fp)   # maximise = minimise cost
         else:
             raise ValueError(f"Unknown metric: {metric}")
-        if val > best_val:
-            best_val, best_thr = val, thr
+        if search_val > best_search_val:
+            best_search_val, best_thr = search_val, thr
 
-    logger.info("Optimal threshold (metric=%s): %.4f → value=%.4f", metric, best_thr, best_val)
-    return round(float(best_thr), 4), round(float(best_val), 4)
+    reported_val = -best_search_val if metric == "cost" else best_search_val
+    logger.info("Optimal threshold (metric=%s): %.4f → value=%.4f", metric, best_thr, reported_val)
+    return round(float(best_thr), 4), round(float(reported_val), 4)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
