@@ -1,7 +1,9 @@
 """Pydantic request / response schemas for the Home Credit Risk API."""
 from __future__ import annotations
-from pydantic import BaseModel, Field
+
 from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class ApplicationInput(BaseModel):
@@ -28,6 +30,8 @@ class ApplicationInput(BaseModel):
     NAME_HOUSING_TYPE:      str   = Field("House / apartment", example="House / apartment")
     REGION_POPULATION_RELATIVE: Optional[float] = Field(None, example=0.0181)
     DAYS_REGISTRATION:      Optional[float] = Field(None, example=-3648.0)
+    DAYS_ID_PUBLISH:        Optional[float] = Field(None, example=-2120.0)
+    DAYS_LAST_PHONE_CHANGE: Optional[float] = Field(None, example=-1134.0)
 
 
 class PredictionResponse(BaseModel):
