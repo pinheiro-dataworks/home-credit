@@ -1,5 +1,6 @@
 """Central configuration — all paths and params loaded from params.yaml."""
 from pathlib import Path
+
 import yaml
 
 ROOT = Path(__file__).parent.parent
@@ -16,6 +17,7 @@ with open(ROOT / "params.yaml") as _f:
 TARGET_COL    = PARAMS["data"]["target_col"]
 ID_COL        = PARAMS["data"]["id_col"]
 RANDOM_STATE  = PARAMS["data"]["random_state"]
+CALIBRATION_SIZE = PARAMS["data"]["calibration_size"]
 TEST_SIZE     = PARAMS["data"]["test_size"]
 NAN_THRESHOLD = PARAMS["feature_engineering"]["nan_threshold"]
 

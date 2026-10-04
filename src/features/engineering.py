@@ -3,11 +3,9 @@ Feature engineering pipeline — creates 200+ features from all 8 raw tables.
 Each function is independently testable and returns a DataFrame indexed on SK_ID_CURR.
 """
 import logging
+
 import numpy as np
 import pandas as pd
-from feature_engine.imputation import MeanMedianImputer, CategoricalImputer
-from feature_engine.encoding import RareLabelEncoder, OrdinalEncoder
-from feature_engine.outliers import Winsorizer
 from sklearn.preprocessing import LabelEncoder
 
 logger = logging.getLogger(__name__)
@@ -310,6 +308,12 @@ def encode_and_impute(df: pd.DataFrame, fit: bool = True,
     """
     Label-encode categoricals and median-impute numerics.
     Returns (transformed_df, state_dict) where state_dict stores encoders.
+
+    Caller contract: fit=True must only ever be used on the training partition.
+    Calibration, test, and submission partitions must be transformed with
+    fit=False against the state fitted on training data, otherwise the
+    encoders/medians leak information about those partitions into the
+    transform applied to the training set.
     """
     if _state is None:
         _state = {}
