@@ -16,7 +16,7 @@ optuna==4.9.0
 optuna-integration==4.9.0
 
 # ─── Explainability ────────────────────────────────────────────────────────────
-shap==0.52.0
+shap==0.51.0  # 0.52.0+ requires Python >=3.12; this project targets 3.11 (Dockerfile, CI)
 
 # ─── Experiment Tracking & Data Versioning ─────────────────────────────────────
 mlflow==3.15.1
