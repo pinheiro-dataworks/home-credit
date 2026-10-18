@@ -239,6 +239,33 @@ full breakdown (all segments, calibration-by-group, error analysis).
 
 ---
 
+## Kaggle Submission
+
+Late submission to the [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk)
+competition (2026-10-18), generated end-to-end by this pipeline
+(`features → stats → train → predict`) running on Kaggle against the official
+competition data. The notebook is versioned here as
+[`notebooks/kaggle_submission.ipynb`](notebooks/kaggle_submission.ipynb).
+
+| Metric | AUC-ROC |
+|---|---|
+| **Private leaderboard** | **0.77543** |
+| **Public leaderboard** | **0.78369** |
+| Internal test partition (same run) | 0.7862 |
+| Optuna CV on train partition (same run) | 0.7803 |
+
+- Kaggle notebook: [Home Credit Default Risk - Late Submission](https://www.kaggle.com/code/pinheirodw17/home-credit-default-risk-late-submission)
+- Run configuration: Optuna reduced to **20 trials** (from 50) to fit Kaggle's
+  session limit; every other setting as in `params.yaml`. Total runtime ≈ 1h26
+  on Kaggle CPU.
+- Submitted after the competition deadline, so it is scored but does not
+  appear on the official leaderboard.
+- The submitted probabilities are the isotonic-calibrated outputs used by the
+  API. Isotonic calibration creates ties between scores, which can slightly
+  lower ranking metrics such as AUC compared with the raw LightGBM scores.
+
+---
+
 ## Limitations
 
 - **Competition dataset, not a production feed.** `application_test.csv` has
@@ -302,6 +329,7 @@ Home_Credit/
 │   └── src/
 │       ├── app/                    # 5 pages: overview, performance, predict, statistics, responsible-ai
 │       └── components/             # Sidebar, TopBar, Charts, Table, PredictionForm
+├── notebooks/kaggle_submission.ipynb # Kaggle late-submission notebook (end-to-end run)
 ├── tests/                          # pytest suite — synthetic fixtures, no real data required
 ├── scripts/compare_sampling.py     # class_weight vs. SMOTE comparison → reports/
 ├── reports/sampling_comparison.md  # Evidence behind the sampling-method default
